@@ -63,9 +63,13 @@
         <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="main-tabs">
           <el-tab-pane label="列表视图" name="list">
             <div class="tab-content-wrapper">
-              <div class="table-wrapper">
+                <div class="table-wrapper">
                 <el-table :data="paginatedData" v-loading="loading" border stripe height="100%">
-                  <el-table-column type="index" label="序号" width="60" align="center" />
+                  <el-table-column label="序号" width="60" align="center">
+                    <template #default="{ $index }">
+                      {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+                    </template>
+                  </el-table-column>
                   <el-table-column label="展示照片" width="110" align="center">
                     <template #default="{ row }">
                       <el-avatar :size="40" :src="getMemberAvatar(row)">

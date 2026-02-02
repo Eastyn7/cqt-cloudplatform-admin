@@ -72,11 +72,66 @@
                   {{ loginLoading ? '登录中...' : '登录' }}
                 </el-button>
               </el-form-item>
+
+              <el-form-item class="forgot-row">
+                <el-button type="primary" link class="forgot-link" @click="openForgotDialog">
+                  忘记密码？
+                </el-button>
+              </el-form-item>
             </el-form>
           </el-card>
         </div>
       </div>
     </Transition>
+
+    <el-dialog
+      v-model="forgotDialogVisible"
+      title="忘记密码"
+      width="520px"
+      :close-on-click-modal="false"
+      @closed="handleForgotDialogClosed"
+    >
+      <el-form
+        ref="forgotFormRef"
+        :model="forgotForm"
+        :rules="forgotRules"
+        label-width="90px"
+        class="forgot-form"
+      >
+        <el-form-item label="学号" prop="student_id">
+          <el-input v-model="forgotForm.student_id" placeholder="请输入学号" />
+        </el-form-item>
+        <el-form-item label="邮箱" prop="email">
+          <el-input v-model="forgotForm.email" placeholder="请输入邮箱" />
+        </el-form-item>
+        <el-form-item label="验证码" prop="code">
+          <el-input v-model="forgotForm.code" placeholder="请输入验证码">
+            <template #append>
+              <el-button :disabled="sendCodeDisabled" :loading="sendCodeLoading" @click="handleSendCode">
+                {{ sendCodeText }}
+              </el-button>
+            </template>
+          </el-input>
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="forgotForm.newPassword"
+            type="password"
+            placeholder="请输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="forgotDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="forgotLoading" @click="handleForgotPassword">
+            重置密码
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
 
     <div class="home-footer">
       <p>© 2025 常青藤志愿服务平台 - 后台管理系统</p>
@@ -91,7 +146,7 @@
 
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus'
-import { authApi } from '../utils/api'
+import { authApi, emailApi } from '../utils/api'
 import type { UserRole } from '../utils/api/types'
 import { message } from '../utils/message'
 import TeamEmblem from '../assets/TeamEmblem.png'
@@ -115,6 +170,124 @@ const loginRules: FormRules = {
     { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
   ],
 }
+
+// 忘记密码相关
+const forgotDialogVisible = ref(false)
+const forgotLoading = ref(false)
+const sendCodeLoading = ref(false)
+const sendCodeCountdown = ref(0)
+let sendCodeTimer: ReturnType<typeof setInterval> | null = null
+
+const forgotFormRef = ref<FormInstance>()
+const forgotForm = reactive({
+  student_id: '',
+  email: '',
+  code: '',
+  newPassword: '',
+})
+
+const forgotRules: FormRules = {
+  student_id: [{ required: true, message: '请输入学号', trigger: 'blur' }],
+  email: [{ required: true, message: '请输入邮箱', trigger: 'blur' }],
+  code: [{ required: true, message: '请输入验证码', trigger: 'blur' }],
+  newPassword: [
+    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' },
+  ],
+}
+
+const sendCodeDisabled = computed(() => sendCodeCountdown.value > 0)
+const sendCodeText = computed(() =>
+  sendCodeCountdown.value > 0 ? `${sendCodeCountdown.value}s` : '发送验证码'
+)
+
+const openForgotDialog = () => {
+  forgotDialogVisible.value = true
+}
+
+const resetForgotForm = () => {
+  forgotForm.student_id = ''
+  forgotForm.email = ''
+  forgotForm.code = ''
+  forgotForm.newPassword = ''
+}
+
+const handleForgotDialogClosed = () => {
+  resetForgotForm()
+  forgotFormRef.value?.clearValidate()
+  if (sendCodeTimer) {
+    clearInterval(sendCodeTimer)
+    sendCodeTimer = null
+  }
+  sendCodeCountdown.value = 0
+}
+
+const startSendCodeCountdown = (seconds = 60) => {
+  sendCodeCountdown.value = seconds
+  if (sendCodeTimer) {
+    clearInterval(sendCodeTimer)
+  }
+  sendCodeTimer = setInterval(() => {
+    if (sendCodeCountdown.value <= 1) {
+      sendCodeCountdown.value = 0
+      if (sendCodeTimer) {
+        clearInterval(sendCodeTimer)
+        sendCodeTimer = null
+      }
+      return
+    }
+    sendCodeCountdown.value -= 1
+  }, 1000)
+}
+
+const handleSendCode = async () => {
+  if (!forgotForm.email) {
+    message.warning('请输入邮箱')
+    return
+  }
+  sendCodeLoading.value = true
+  try {
+    await emailApi.sendCode({
+      email: forgotForm.email,
+      type: 'reset_password',
+    })
+    message.success('验证码已发送')
+    startSendCodeCountdown()
+  } catch (error) {
+    console.error('发送验证码失败:', error)
+  } finally {
+    sendCodeLoading.value = false
+  }
+}
+
+const handleForgotPassword = async () => {
+  if (!forgotFormRef.value) return
+  await forgotFormRef.value.validate(async (valid) => {
+    if (!valid) return
+    forgotLoading.value = true
+    try {
+      await authApi.forgotPassword({
+        student_id: forgotForm.student_id,
+        email: forgotForm.email,
+        newPassword: forgotForm.newPassword,
+        code: forgotForm.code,
+      })
+      message.success('密码已重置，请使用新密码登录')
+      forgotDialogVisible.value = false
+      resetForgotForm()
+    } catch (error) {
+      console.error('重置密码失败:', error)
+    } finally {
+      forgotLoading.value = false
+    }
+  })
+}
+
+onBeforeUnmount(() => {
+  if (sendCodeTimer) {
+    clearInterval(sendCodeTimer)
+  }
+})
 
 // 处理登录
 const handleLogin = async () => {
@@ -214,6 +387,14 @@ const handleLogin = async () => {
   font-weight: 700;
   line-height: 1;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.forgot-row {
+  margin-top: -8px;
+}
+
+.forgot-link {
+  padding: 0;
 }
 
 .subtitle {

@@ -20,6 +20,10 @@ import type {
   RegisterParams,
   LoginParams,
   LoginResponse,
+  ForgotPasswordParams,
+  ForgotPasswordResponse,
+  AdminResetPasswordParams,
+  AdminResetPasswordResponse,
   BatchRegisterUser,
   BatchRegisterResponse,
   DeleteUserResponse,
@@ -61,11 +65,14 @@ import type {
   ActivityInfo,
   ActivityPageResponse,
   ActivityListResponse,
+  ActivityCategoryListResponse,
+  ActivityNameListResponse,
   UpdateActivityParams,
   UpdateActivityResponse,
   ChangeActivityStatusParams,
   ChangeActivityStatusResponse,
   ActivityParticipantListResponse,
+  ActivityParticipantPageResponse,
   JoinActivityParams,
   JoinActivityResponse,
   SignInActivityParams,
@@ -73,6 +80,10 @@ import type {
   UpdateServiceHoursResponse,
   BatchUpdateServiceHoursParams,
   BatchUpdateServiceHoursResponse,
+  ApproveActivityParticipantParams,
+  ApproveActivityParticipantResponse,
+  BatchApproveActivityParticipantParams,
+  BatchApproveActivityParticipantResponse,
   StudentActivityRecordsPageResponse,
   StudentActivityRecordsListResponse,
   AllActivityParticipantsPageResponse,
@@ -127,6 +138,15 @@ import type {
   RemoveAdminParams,
   RemoveAdminResponse,
   BatchSetUserRolesParams,
+  DashboardTimeRange,
+  DashboardDataResponse,
+  TaskConfigInfo,
+  UpdateTaskConfigParams,
+  TaskExecutionResult,
+  TaskLogQueryParams,
+  TaskConfigQueryParams,
+  TaskConfigListResponse,
+  TaskLogListResponse,
 } from './types'
 
 // ==================== OSS 相关 API ====================
@@ -151,6 +171,7 @@ export const emailApi = {
       skipAuth: true, // 公共接口，不需要鉴权
       showSuccess: true,
     }),
+
 
   /**
    * 校验邮箱验证码
@@ -202,6 +223,23 @@ export const authApi = {
   login: (params: LoginParams) =>
     request.post<LoginResponse>('/public/auth/login', params, {
       skipAuth: true, // 公共接口，不需要鉴权
+      showSuccess: true,
+    }),
+
+  /**
+   * 忘记密码（邮箱验证码）
+   */
+  forgotPassword: (params: ForgotPasswordParams) =>
+    request.post<ForgotPasswordResponse>('/public/auth/forgot-password', params, {
+      skipAuth: true,
+      showSuccess: true,
+    }),
+
+  /**
+   * 管理员重置用户密码
+   */
+  resetUserPassword: (params: AdminResetPasswordParams) =>
+    request.post<AdminResetPasswordResponse>('/auth/login/admin/reset-password', params, {
       showSuccess: true,
     }),
 
@@ -557,6 +595,11 @@ export const activityApi = {
     }),
 
   /**
+   * 获取活动名称列表（管理员筛选）
+   */
+  getNames: () => request.get<ActivityNameListResponse>('/activities/names'),
+
+  /**
    * 获取活动详情
    * 公开接口，获取单个志愿活动的详细信息
    * @param activity_id 活动主键ID
@@ -571,7 +614,7 @@ export const activityApi = {
    * 公开接口，获取所有活动的活动类别
    */
   getCategories: () =>
-    request.get<string[]>('/activities/categories', {
+    request.get<ActivityCategoryListResponse>('/public/activities/categories', {
       skipAuth: true, // 公共接口，不需要鉴权
     }),
 
@@ -622,6 +665,19 @@ export const activityParticipantApi = {
     request.get<ActivityParticipantListResponse>(`/activity-participants/list/${activity_id}`, { params }),
 
   /**
+   * 获取活动报名名单（分页，管理员）
+   * admin / superadmin 可使用
+   * @param activity_id 活动主键ID
+   */
+  getPageByActivity: (
+    activity_id: number,
+    params?: { page?: number; pageSize?: number; search?: string }
+  ) =>
+    request.get<ActivityParticipantPageResponse>(`/activity-participants/page/${activity_id}`, {
+      params,
+    }),
+
+  /**
    * 学生报名活动
    * user / admin / superadmin 可使用
    * 普通用户仅可自己报名，管理员/超管可代报
@@ -670,6 +726,23 @@ export const activityParticipantApi = {
     }),
 
   /**
+   * 审核报名（单个，管理员）
+   * @param record_id 报名记录主键ID
+   */
+  approve: (record_id: number, params: ApproveActivityParticipantParams) =>
+    request.patch<ApproveActivityParticipantResponse>(`/activity-participants/approve/${record_id}`, params, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 批量审核报名（管理员）
+   */
+  batchApprove: (params: BatchApproveActivityParticipantParams) =>
+    request.put<BatchApproveActivityParticipantResponse>('/activity-participants/approve/batch', params, {
+      showSuccess: true,
+    }),
+
+  /**
    * 批量更新服务时长（管理员）
    * admin / superadmin 可使用
    * @param params 批量更新列表
@@ -702,7 +775,7 @@ export const activityParticipantApi = {
    * admin / superadmin 可使用
    * 获取系统中所有活动的参与记录（关联活动、学生信息）
    */
-  getAllPage: (params?: { page?: number; pageSize?: number; search?: string }) =>
+  getAllPage: (params?: { page?: number; pageSize?: number; search?: string; activity_id?: number }) =>
     request.get<AllActivityParticipantsPageResponse>('/activity-participants/all/page', { params }),
 
   /**
@@ -1166,6 +1239,19 @@ export const recruitmentSeasonApi = {
     }),
 }
 
+// ==================== Dashboard 数据驾驶舱 API ====================
+
+export const dashboardApi = {
+  /**
+   * 获取驾驶舱数据
+   * @param timeRange 时间范围：30d / 90d / 1y / all
+   */
+  getDashboardData: (timeRange: DashboardTimeRange = '30d') =>
+    request.get<DashboardDataResponse>('/dashboard/data', {
+      params: { timeRange },
+    }),
+}
+
 // ==================== 权限管理 API ====================
 
 /**
@@ -1176,7 +1262,7 @@ export const permissionApi = {
    * 获取所有管理员分页列表
    * admin / superadmin 可使用
    */
-  getAllAdmins: (params?: { page?: number; pageSize?: number }) =>
+  getAllAdmins: (params?: PaginationParams) =>
     request.get<AdminPageResponse>('/auth/login/admin/list-page', { params }),
 
   /**
@@ -1191,7 +1277,7 @@ export const permissionApi = {
    * @param params 设置管理员参数
    */
   setAdmin: (params: SetAdminParams) =>
-    request.post<SetAdminResponse>('/auth/login/admin/set', params, {
+    request.post<SetAdminResponse>('/auth/login/admin/set-single', params, {
       showSuccess: true,
     }),
 
@@ -1201,7 +1287,7 @@ export const permissionApi = {
    * @param params 批量设置参数
    */
   batchSetUserRoles: (params: BatchSetUserRolesParams) =>
-    request.post('/auth/login/admin/set/batch', params, {
+    request.post('/auth/login/admin/set', params, {
       showSuccess: true,
     }),
 
@@ -1225,6 +1311,54 @@ export const permissionApi = {
     request.get<UserInfoPageResponse>(`/auth/login/users/search?q=${encodeURIComponent(query)}`, { params }),
 }
 
+// ==================== 定时任务管理 API ====================
+
+export const taskApi = {
+  /**
+   * 获取所有任务配置（分页）
+   * admin / superadmin 可使用
+   * @param params 分页参数
+   */
+  getTaskConfigs: (params?: TaskConfigQueryParams) =>
+    request.get<TaskConfigListResponse>('/tasks/configs', { params }),
+
+  /**
+   * 获取单个任务配置
+   * admin / superadmin 可使用
+   * @param taskCode 任务代码
+   */
+  getTaskConfig: (taskCode: string) => request.get<TaskConfigInfo>(`/tasks/configs/${taskCode}`),
+
+  /**
+   * 更新任务配置
+   * admin / superadmin 可使用
+   * @param taskCode 任务代码
+   * @param data 更新数据
+   */
+  updateTaskConfig: (taskCode: string, data: UpdateTaskConfigParams) =>
+    request.patch<TaskConfigInfo>(`/tasks/configs/${taskCode}`, data, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 手动执行任务一次
+   * admin / superadmin 可使用
+   * @param taskCode 任务代码
+   */
+  runTask: (taskCode: string) =>
+    request.post<TaskExecutionResult>(`/tasks/${taskCode}/run`, {}, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 获取任务执行日志（分页）
+   * admin / superadmin 可使用
+   * @param params 分页和筛选参数（支持 page, pageSize, task_code, task_name）
+   */
+  getTaskLogs: (params?: TaskLogQueryParams) =>
+    request.get<TaskLogListResponse>(`/tasks/logs`, { params }),
+}
+
 // 导出所有 API
 export default {
   ossApi,
@@ -1245,5 +1379,7 @@ export default {
   operationLogApi,
   recruitmentApi,
   recruitmentSeasonApi,
+  dashboardApi,
   permissionApi,
+  taskApi,
 }

@@ -112,7 +112,11 @@
             @sort-change="handleSortChange"
           >
             <el-table-column v-if="isSuperAdmin" type="selection" width="55" align="center" />
-            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column label="序号" width="60" align="center">
+              <template #default="{ $index }">
+                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+              </template>
+            </el-table-column>
             <el-table-column label="头像" width="90" align="center">
               <template #default="{ row }">
                 <el-avatar :size="32" :src="getAvatarUrl(row)">{{
@@ -291,6 +295,14 @@
       <template #footer>
         <span class="drawer-footer">
           <el-button @click="detailVisible = false">取消</el-button>
+          <el-button
+            v-if="canResetPassword"
+            type="warning"
+            :loading="resetPasswordLoading"
+            @click="handleResetPassword"
+          >
+            重置密码
+          </el-button>
           <el-button type="primary" :loading="detailSaving" @click="handleDetailSave"
             >保存</el-button
           >
@@ -487,6 +499,7 @@ const appliedFilters = reactive({
 // 从本地存储读取当前登录用户角色
 const currentRole = computed(() => localStorage.getItem('role') || '')
 const isSuperAdmin = computed(() => currentRole.value === 'superadmin')
+const canResetPassword = computed(() => ['admin', 'superadmin'].includes(currentRole.value))
 
 const roleLabelMap: Record<UserInfo['role'], string> = {
   user: '普通用户',
@@ -638,6 +651,7 @@ const handleResetFilters = () => {
 // 抽屉中展示和编辑的用户详情表单
 const detailVisible = ref(false)
 const detailSaving = ref(false)
+const resetPasswordLoading = ref(false)
 const detailForm = reactive({
   student_id: '',
   name: '',
@@ -847,6 +861,38 @@ const handleDetailSave = async () => {
   }
 }
 
+const handleResetPassword = async () => {
+  if (!detailForm.student_id) return
+  try {
+    await ElMessageBox.confirm(
+      `确定要重置用户 ${detailForm.student_id} 的密码吗？`,
+      '确认重置',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    )
+    resetPasswordLoading.value = true
+    const res = await authApi.resetUserPassword({ student_id: detailForm.student_id })
+    const defaultPassword = res.data?.defaultPassword
+    if (defaultPassword) {
+      await ElMessageBox.alert(`默认密码：${defaultPassword}`, '重置成功', {
+        confirmButtonText: '知道了',
+      })
+    } else {
+      ElMessage.success(res.data?.message || '重置成功')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('重置密码失败:', error)
+      ElMessage.error('重置密码失败')
+    }
+  } finally {
+    resetPasswordLoading.value = false
+  }
+}
+
 // 打开批量新增弹窗
 const openAddDialog = () => {
   addDialogVisible.value = true
@@ -1017,6 +1063,11 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
 }
 
 .content {

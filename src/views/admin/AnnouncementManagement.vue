@@ -82,7 +82,11 @@
 
         <div class="table-wrapper">
           <el-table :data="paginatedData" v-loading="loading" border stripe table-layout="auto">
-            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column label="序号" width="60" align="center">
+              <template #default="{ $index }">
+                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+              </template>
+            </el-table-column>
             <el-table-column prop="title" label="标题" min-width="220" />
             <el-table-column prop="term_name" label="届次" width="120" />
             <el-table-column prop="status" label="状态" width="100" align="center">

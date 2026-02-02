@@ -22,7 +22,7 @@
                 <el-form-item>
                   <el-input
                     v-model="searchForm.keyword"
-                    placeholder="活动名称 / 学生姓名 / 学号 / 学院"
+                    placeholder="姓名 / 学号 / 学院"
                     clearable
                     @keyup.enter="handleSearch"
                     class="search-input"
@@ -33,6 +33,50 @@
                       </el-icon>
                     </template>
                   </el-input>
+                </el-form-item>
+
+                <el-form-item>
+                  <el-select
+                    v-model="searchForm.activity_id"
+                    placeholder="按活动筛选"
+                    clearable
+                    filterable
+                    class="search-select"
+                  >
+                    <el-option
+                      v-for="act in activityOptions"
+                      :key="act.activity_id"
+                      :label="act.activity_name"
+                      :value="act.activity_id"
+                    />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item>
+                  <el-select
+                    v-model="searchForm.status"
+                    placeholder="报名状态"
+                    clearable
+                    class="search-select"
+                  >
+                    <el-option label="全部" value="" />
+                    <el-option label="待审核" value="待审核" />
+                    <el-option label="已同意" value="已同意" />
+                    <el-option label="已拒绝" value="已拒绝" />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item>
+                  <el-select
+                    v-model="searchForm.signed_in"
+                    placeholder="签到状态"
+                    clearable
+                    class="search-select"
+                  >
+                    <el-option label="全部" value="" />
+                    <el-option label="已签到" :value="1" />
+                    <el-option label="未签到" :value="0" />
+                  </el-select>
                 </el-form-item>
 
                 <el-form-item>
@@ -54,18 +98,64 @@
                 </el-form-item>
               </el-form>
             </div>
+            <div class="header-right">
+              <el-button
+                type="success"
+                :disabled="approveDisabled"
+                @click="handleBulkApprove(true)"
+              >
+                同意所选
+              </el-button>
+              <el-button
+                type="danger"
+                :disabled="approveDisabled"
+                @click="handleBulkApprove(false)"
+              >
+                拒绝所选
+              </el-button>
+              <el-divider direction="vertical" />
+              <el-button
+                type="info"
+                :disabled="signInDisabled"
+                @click="handleBulkSignIn"
+              >
+                批量签到
+              </el-button>
+            </div>
           </div>
         </template>
 
         <div class="table-wrapper">
-          <el-table :data="paginatedData" v-loading="loading" border stripe table-layout="auto">
-            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table
+              :data="paginatedData"
+              v-loading="loading"
+              border
+              stripe
+              table-layout="auto"
+              @selection-change="handleSelectionChange"
+            >
+            <el-table-column type="selection" width="50" align="center" fixed="left" />
+            <el-table-column label="序号" width="60" align="center">
+              <template #default="{ $index }">
+                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+              </template>
+            </el-table-column>
             <el-table-column prop="activity_name" label="活动名称" min-width="200" />
             <el-table-column prop="activity_status" label="活动状态" width="100">
               <template #default="{ row }">
                 <el-tag :type="getDisplayStatusType(row)">
                   {{ getDisplayStatus(row) }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="报名状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getSignupStatusType(row.status)">{{ row.status || '待审核' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="approval_reason" label="审核备注" min-width="160">
+              <template #default="{ row }">
+                <span>{{ row.approval_reason || '--' }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="student_name" label="学生姓名" width="120" />
@@ -79,7 +169,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="280" align="center" fixed="right">
+            <el-table-column label="操作" width="220" align="center" fixed="right">
               <template #default="{ row }">
                 <el-button type="primary" link size="small" @click="openDetail(row)"
                   >查看详情</el-button
@@ -125,6 +215,16 @@
               {{ getDisplayStatus(detailForm) || '--' }}
             </el-tag>
           </el-descriptions-item>
+          <el-descriptions-item label="报名状态">
+            <el-tag :type="getSignupStatusType(detailForm.status)">
+              {{ detailForm.status || '待审核' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="审核备注">{{ detailForm.approval_reason || '--' }}</el-descriptions-item>
+          <el-descriptions-item label="审核人">{{ detailForm.approved_by || '--' }}</el-descriptions-item>
+          <el-descriptions-item label="审核时间">{{
+            dateUtil.format(detailForm.approved_at) || '--'
+          }}</el-descriptions-item>
           <el-descriptions-item label="学生姓名">{{
             detailForm.student_name || '--'
           }}</el-descriptions-item>
@@ -198,8 +298,8 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Refresh } from '@element-plus/icons-vue'
-import { activityParticipantApi } from '@/utils/api'
-import type { StudentActivityRecord } from '@/utils/api/types'
+import { activityApi, activityParticipantApi } from '@/utils/api'
+import type { ActivityNameInfo, StudentActivityRecord } from '@/utils/api/types'
 import { useDate } from '@/utils/date'
 
 const router = useRouter()
@@ -207,12 +307,15 @@ const dateUtil = useDate
 
 const loading = ref(false)
 const tableData = ref<StudentActivityRecord[]>([])
+const selectedRows = ref<StudentActivityRecord[]>([])
 
 const pagination = reactive({
   page: 1,
   pageSize: 10,
   total: 0,
 })
+
+const activityOptions = ref<ActivityNameInfo[]>([])
 
 const handleBack = () => {
   router.push('/admin/dashboard')
@@ -221,10 +324,17 @@ const handleBack = () => {
 // 搜索表单
 const searchForm = reactive({
   keyword: '',
+  activity_id: '' as number | '',
+  status: '',
+  signed_in: '' as number | '',
 })
 
 const appliedFilters = reactive({
   keyword: '',
+  activity_id: '' as number | '',
+  activity_name: '',
+  status: '',
+  signed_in: '' as number | '',
 })
 
 // 移除前端过滤逻辑，现在搜索在后端进行
@@ -232,6 +342,18 @@ const appliedFilters = reactive({
 // 计算当前页应该显示的数据（直接使用后端分页的数据）
 const paginatedData = computed(() => {
   return tableData.value
+})
+
+const approveDisabled = computed(() => {
+  if (!selectedRows.value.length) return true
+  const hasInvalid = selectedRows.value.some((row) => row.status && row.status !== '待审核')
+  return hasInvalid
+})
+
+const signInDisabled = computed(() => {
+  if (!selectedRows.value.length) return true
+  // 只要有至少一条记录可以签到就启用按钮
+  return false
 })
 
 // 移除前端分页监听，现在分页在后端进行
@@ -248,6 +370,17 @@ const getActivityStatusType = (
     ending: undefined,
   }
   return map[status] || undefined
+}
+
+const getSignupStatusType = (
+  status?: string | null
+): 'success' | 'warning' | 'primary' | 'info' | 'danger' | undefined => {
+  const map: Record<string, 'success' | 'warning' | 'primary' | 'info' | 'danger' | undefined> = {
+    待审核: 'warning',
+    已同意: 'success',
+    已拒绝: 'danger',
+  }
+  return status ? map[status] : 'warning'
 }
 
 const getActivityStatusLabel = (status: string): string => {
@@ -300,12 +433,20 @@ const getDisplayStatusType = (record: {
 // 搜索
 const handleSearch = async () => {
   appliedFilters.keyword = searchForm.keyword
+  appliedFilters.activity_id = searchForm.activity_id
+  appliedFilters.status = searchForm.status
+  appliedFilters.signed_in = searchForm.signed_in
+  const target = activityOptions.value.find((a) => a.activity_id === searchForm.activity_id)
+  appliedFilters.activity_name = target?.activity_name || ''
   pagination.page = 1
   await loadData()
 }
 
 const handleResetFilters = async () => {
   searchForm.keyword = ''
+  searchForm.activity_id = ''
+  searchForm.status = ''
+  searchForm.signed_in = ''
   await handleSearch()
 }
 
@@ -318,6 +459,10 @@ const detailForm = reactive({
   student_name: '',
   student_id: '',
   college: '',
+  status: '',
+  approval_reason: '',
+  approved_by: '',
+  approved_at: '',
   service_hours: 0,
   signed_in: 0,
   created_at: '',
@@ -345,6 +490,10 @@ const openDetail = (row: StudentActivityRecord) => {
   detailForm.student_name = row.student_name || ''
   detailForm.student_id = row.student_id || ''
   detailForm.college = row.college || ''
+  detailForm.status = row.status || '待审核'
+  detailForm.approval_reason = row.approval_reason || ''
+  detailForm.approved_by = row.approved_by || ''
+  detailForm.approved_at = row.approved_at || ''
   detailForm.service_hours = row.service_hours || 0
   detailForm.signed_in = row.signed_in || 0
   detailForm.created_at = row.created_at || ''
@@ -364,6 +513,120 @@ const handleSignIn = (row: StudentActivityRecord) => {
         await loadData()
       } catch (error) {
         console.error('更新签到状态失败:', error)
+      }
+    })
+    .catch(() => {})
+}
+
+const handleSelectionChange = (rows: StudentActivityRecord[]) => {
+  selectedRows.value = rows
+}
+
+const submitApprovals = async (
+  rows: StudentActivityRecord[],
+  approved: boolean,
+  reason?: string
+) => {
+  if (!rows.length) return
+  const approval_reason = (reason || '').trim() || undefined
+
+  try {
+    if (rows.length === 1 && rows[0]) {
+      await activityParticipantApi.approve(rows[0].record_id, {
+        approved,
+        approval_reason,
+      })
+    } else {
+      const approvals = rows.map((row) => ({
+        record_id: row.record_id,
+        approved,
+        approval_reason,
+      }))
+      await activityParticipantApi.batchApprove({ approvals })
+    }
+    ElMessage.success(approved ? '已同意所选报名' : '已拒绝所选报名')
+    await loadData()
+    selectedRows.value = []
+  } catch (error) {
+    console.error('审批失败:', error)
+  }
+}
+
+const handleBulkApprove = (approved: boolean) => {
+  if (!selectedRows.value.length) {
+    ElMessage.warning('请先选择待审核记录')
+    return
+  }
+
+  const invalid = selectedRows.value.filter((row) => row.status && row.status !== '待审核')
+  if (invalid.length) {
+    ElMessage.warning('仅可操作待审核记录，请重新选择')
+    return
+  }
+
+  const targetRows = [...selectedRows.value]
+
+  if (approved) {
+    ElMessageBox.confirm(`确认同意选中的 ${targetRows.length} 条报名吗？`, '审核确认', {
+      type: 'warning',
+    })
+      .then(async () => {
+        await submitApprovals(targetRows, true)
+      })
+      .catch(() => {})
+  } else {
+    ElMessageBox.prompt('请输入拒绝原因（可选）', '拒绝所选', {
+      inputType: 'textarea',
+      confirmButtonText: '提交',
+      cancelButtonText: '取消',
+    })
+      .then(async ({ value }) => {
+        await submitApprovals(targetRows, false, value)
+      })
+      .catch(() => {})
+  }
+}
+
+const handleBulkSignIn = () => {
+  if (!selectedRows.value.length) {
+    ElMessage.warning('请先选择要签到的记录')
+    return
+  }
+
+  // 统计已签到和未签到的记录
+  const signedIn = selectedRows.value.filter((row) => row.signed_in === 1)
+  const notSignedIn = selectedRows.value.filter((row) => row.signed_in !== 1)
+
+  let message = ''
+  if (signedIn.length > 0 && notSignedIn.length > 0) {
+    message = `选中 ${selectedRows.value.length} 条记录：${signedIn.length} 条已签到，${notSignedIn.length} 条未签到。\n确认将未签到的记录改为已签到吗？`
+  } else if (notSignedIn.length > 0) {
+    message = `确认将选中的 ${notSignedIn.length} 条记录改为已签到吗？`
+  } else {
+    ElMessage.info('选中的记录均已签到')
+    return
+  }
+
+  ElMessageBox.confirm(message, '批量签到确认', {
+    type: 'warning',
+  })
+    .then(async () => {
+      try {
+        // 调用后端的批量签到接口
+        // 预留接口：activityParticipantApi.batchSignIn({ records: notSignedIn.map(r => ({ record_id: r.record_id, signed_in: 1 })) })
+        
+        // 临时方案：逐条调用单个签到接口（等后端提供批量签到接口后替换）
+        const promises = notSignedIn.map((row) =>
+          activityParticipantApi.signIn(row.record_id, { signed_in: 1 })
+        )
+        await Promise.all(promises)
+        
+        ElMessage.success(`已将 ${notSignedIn.length} 条记录改为已签到`)
+        selectedRows.value = []
+        await loadData()
+      } catch (error) {
+        console.error('批量签到失败:', error)
+        ElMessage.error('批量签到失败')
       }
     })
     .catch(() => {})
@@ -442,11 +705,15 @@ const loadData = async () => {
       page: pagination.page,
       pageSize: pagination.pageSize,
       search: appliedFilters.keyword || undefined,
+      activity_name: appliedFilters.activity_name || undefined,
+      status: appliedFilters.status || undefined,
+      signed_in: appliedFilters.signed_in !== '' ? appliedFilters.signed_in : undefined,
     }
     const response = await activityParticipantApi.getAllPage(params)
     if (response.data?.list) {
       tableData.value = response.data.list
       pagination.total = response.data.pagination.total
+      selectedRows.value = []
     }
   } catch (error) {
     console.error('加载参与记录失败:', error)
@@ -456,8 +723,18 @@ const loadData = async () => {
   }
 }
 
+const loadActivities = async () => {
+  try {
+    const res = await activityApi.getNames()
+    activityOptions.value = res.data?.list || []
+  } catch (error) {
+    console.error('加载活动列表失败:', error)
+  }
+}
+
 onMounted(() => {
   loadData()
+  loadActivities()
 })
 </script>
 
@@ -537,7 +814,7 @@ onMounted(() => {
 }
 
 .search-input {
-  width: 280px !important;
+  width: 200px !important;
   min-width: 200px;
 }
 

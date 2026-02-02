@@ -31,7 +31,7 @@
           <el-table :data="tableData" v-loading="loading" border stripe table-layout="auto">
             <el-table-column type="index" label="序号" width="60" align="center">
               <template #default="{ $index }">
-                {{ $index + 1 }}
+                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
               </template>
             </el-table-column>
             <el-table-column prop="year" label="年份" width="100" align="center" />
@@ -86,6 +86,18 @@
               </template>
             </el-table-column>
           </el-table>
+        </div>
+
+        <div class="pagination-container">
+          <el-pagination
+            v-model:current-page="pagination.page"
+            v-model:page-size="pagination.pageSize"
+            :total="pagination.total"
+            :page-sizes="[10, 20, 50, 100]"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleSizeChange"
+            @current-change="handlePageChange"
+          />
         </div>
       </el-card>
     </div>
@@ -171,6 +183,12 @@ const addDialogVisible = ref(false)
 const addLoading = ref(false)
 const closeAllLoading = ref(false)
 const addFormRef = ref<FormInstance>()
+
+const pagination = reactive({
+  page: 1,
+  pageSize: 20,
+  total: 0,
+})
 
 // 获取当前用户角色
 const currentRole = computed(() => localStorage.getItem('role') || '')
@@ -298,12 +316,24 @@ const handleDelete = async (row: RecruitmentSeasonInfo) => {
   }
 }
 
+const handleSizeChange = (size: number) => {
+  pagination.pageSize = size
+  pagination.page = 1
+  loadData()
+}
+
+const handlePageChange = (page: number) => {
+  pagination.page = page
+  loadData()
+}
+
 const loadData = async () => {
   try {
     loading.value = true
     const res = await recruitmentSeasonApi.getList()
     if (res.data?.list) {
       tableData.value = res.data.list
+      pagination.total = res.data.list.length
     }
   } catch (error) {
     console.error('加载报名通道列表失败:', error)
@@ -397,6 +427,15 @@ onMounted(() => {
 
 .table-wrapper :deep(.el-table__body-wrapper) {
   overflow: auto;
+}
+
+.pagination-container {
+  margin-top: 0;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #ebeef5;
+  background-color: #ffffffac;
 }
 </style>
 

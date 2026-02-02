@@ -113,22 +113,23 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="expires_at" label="过期时间" width="180">
-              <template #default="{ row }">
-                <span>{{ dateUtil.formatTime(row.expires_at) || '--' }}</span>
-                <el-tag
-                  v-if="isExpired(row.expires_at)"
-                  type="danger"
-                  size="small"
-                  style="margin-left: 8px"
-                >
-                  已过期
-                </el-tag>
-              </template>
-            </el-table-column>
             <el-table-column prop="created_at" label="创建时间" width="180">
               <template #default="{ row }">
                 <span>{{ dateUtil.formatTime(row.created_at) || '--' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="expires_at" label="过期时间" min-width="180">
+              <template #default="{ row }">
+                <div class="expires-cell">
+                  <span>{{ dateUtil.formatTime(row.expires_at) || '--' }}</span>
+                  <el-tag
+                    v-if="isExpired(row.expires_at)"
+                    type="danger"
+                    size="small"
+                  >
+                    已过期
+                  </el-tag>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -540,5 +541,11 @@ onMounted(() => {
   font-size: 12px;
   margin-top: 12px;
   line-height: 1.6;
+}
+
+.expires-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

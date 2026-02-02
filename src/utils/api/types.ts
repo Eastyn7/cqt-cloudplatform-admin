@@ -140,6 +140,38 @@ export interface LoginResponse {
 }
 
 /**
+ * 忘记密码请求参数
+ */
+export interface ForgotPasswordParams {
+  student_id: string
+  email: string
+  newPassword: string
+  code: string
+}
+
+/**
+ * 忘记密码响应数据
+ */
+export interface ForgotPasswordResponse {
+  message: string
+}
+
+/**
+ * 管理员重置用户密码请求参数
+ */
+export interface AdminResetPasswordParams {
+  student_id: string
+}
+
+/**
+ * 管理员重置用户密码响应数据
+ */
+export interface AdminResetPasswordResponse {
+  message: string
+  defaultPassword?: string
+}
+
+/**
  * 批量注册用户项
  */
 export interface BatchRegisterUser {
@@ -699,6 +731,8 @@ export interface CreateActivityParams {
   category?: string // 活动类别
   cover_key?: string // 封面图片 OSS 存储 key
   recruitment_limit?: number // 招募人数
+  signup_start_time?: string // 报名开始时间
+  signup_end_time?: string // 报名截止时间
   service_hours?: number // 服务时长
   location?: string // 活动地点
   start_time?: string // 开始时间
@@ -731,6 +765,8 @@ export interface ActivityInfo {
   category?: string | null
   cover_key?: string | null
   recruitment_limit?: number | null
+  signup_start_time?: string | null
+  signup_end_time?: string | null
   service_hours?: number | null
   location?: string | null
   start_time?: string | null
@@ -752,6 +788,25 @@ export type ActivityPageResponse = PaginationResponse<ActivityInfo>
 export type ActivityListResponse = ListResponse<ActivityInfo>
 
 /**
+ * 活动类别列表响应数据
+ */
+export type ActivityCategoryListResponse = ListResponse<string>
+
+/**
+ * 活动名称精简项（用于筛选下拉）
+ */
+export interface ActivityNameInfo {
+  activity_id: number
+  activity_name: string
+  status?: string | null
+}
+
+/**
+ * 活动名称列表响应
+ */
+export type ActivityNameListResponse = ListResponse<ActivityNameInfo>
+
+/**
  * 更新志愿活动信息请求参数
  */
 export interface UpdateActivityParams {
@@ -761,6 +816,8 @@ export interface UpdateActivityParams {
   category?: string // 活动类别
   cover_key?: string // 封面图片 OSS 存储 key
   recruitment_limit?: number // 招募人数
+  signup_start_time?: string // 报名开始时间
+  signup_end_time?: string // 报名截止时间
   service_hours?: number // 服务时长
   location?: string // 活动地点
   start_time?: string // 开始时间
@@ -806,10 +863,15 @@ export interface ActivityParticipantInfo {
   college?: string | null
   major?: string | null
   role: string
+  status?: string | null
+  approved_by?: string | null
+  approval_reason?: string | null
+  approved_at?: string | null
   service_hours: number
   signed_in: number
   remark?: string | null
   created_at: string
+  updated_at?: string | null
 }
 
 /**
@@ -851,6 +913,23 @@ export interface SignInActivityParams {
  */
 export interface UpdateServiceHoursParams {
   service_hours: number // 服务时长（数字类型）
+}
+
+/**
+ * 审核报名请求参数
+ */
+export interface ApproveActivityParticipantParams {
+  approved: boolean // 是否同意
+  approval_reason?: string // 审核备注
+}
+
+/**
+ * 审核报名响应数据
+ */
+export interface ApproveActivityParticipantResponse {
+  message: string
+  record_id?: number
+  status?: string
 }
 
 /**
@@ -906,6 +985,33 @@ export interface BatchUpdateServiceHoursResponse {
 }
 
 /**
+ * 批量审核报名请求项
+ */
+export interface BatchApproveItem {
+  record_id: number
+  approved: boolean
+  approval_reason?: string
+}
+
+/**
+ * 批量审核报名请求参数
+ */
+export interface BatchApproveActivityParticipantParams {
+  approvals: BatchApproveItem[]
+}
+
+/**
+ * 批量审核报名响应数据
+ */
+export interface BatchApproveActivityParticipantResponse {
+  total: number
+  success: number
+  failed: number
+  successList: { record_id: number; status: string }[]
+  failedList: { record_id: number; reason: string }[]
+}
+
+/**
  * 学生个人报名记录项
  */
 export interface StudentActivityRecord {
@@ -922,6 +1028,10 @@ export interface StudentActivityRecord {
   college?: string | null
   major?: string | null
   role: string
+  status?: string | null
+  approved_by?: string | null
+  approval_reason?: string | null
+  approved_at?: string | null
   service_hours: number
   signed_in: number
   remark?: string | null
@@ -1439,6 +1549,18 @@ export interface SubmitRecruitmentParams {
 }
 
 /**
+ * 获取报名列表请求参数
+ */
+export interface GetRecruitmentListParams {
+  page?: number
+  pageSize?: number
+  year?: number
+  type?: RecruitmentType
+  status?: RecruitmentStatus
+  search?: string
+}
+
+/**
  * 报名列表响应数据
  */
 export interface RecruitmentListResponse {
@@ -1570,6 +1692,67 @@ export interface DeleteSeasonResponse {
   message: string
 }
 
+// ==================== Dashboard 相关类型 ====================
+
+export type DashboardTimeRange = '30d' | '90d' | '1y' | 'all'
+
+export interface DashboardKpiBlock {
+  value: number
+  trend: number | null
+  trendDirection: 'up' | 'down' | null
+}
+
+export interface DashboardKpiMetrics {
+  volunteerCount: DashboardKpiBlock
+  totalServiceHours: DashboardKpiBlock
+  honorCount: DashboardKpiBlock
+  ongoingActivityCount: DashboardKpiBlock
+}
+
+export interface DashboardVolunteerTrendPoint {
+  label: string
+  signup: number
+  attend: number
+  hours: number
+}
+
+export interface DashboardActivitySlice {
+  name: string
+  value: number
+}
+
+export interface DashboardMajorStat {
+  name: string
+  hours: number
+  volunteerCount: number
+}
+
+export interface DashboardTopVolunteer {
+  studentId: string
+  name: string
+  department: string
+  hours: number
+  skills: string[]
+}
+
+export interface DashboardUpcomingActivity {
+  activityId: number
+  title: string
+  startTime: string
+  endTime: string
+  participants: number
+  status: 'draft' | 'ongoing' | 'ending'
+}
+
+export interface DashboardDataResponse {
+  kpiMetrics: DashboardKpiMetrics
+  volunteerTrend: DashboardVolunteerTrendPoint[]
+  activityDistribution: DashboardActivitySlice[]
+  majorStats: DashboardMajorStat[]
+  topVolunteers: DashboardTopVolunteer[]
+  upcomingActivities: DashboardUpcomingActivity[]
+}
+
 // ==================== 权限管理相关类型 ====================
 
 /**
@@ -1599,6 +1782,7 @@ export type AdminListResponse = ListResponse<AdminInfo>
  */
 export interface SetAdminParams {
   student_id: string
+  role: 'admin' | 'superadmin'
 }
 
 /**
@@ -1626,8 +1810,10 @@ export interface RemoveAdminResponse {
  * 批量设置用户角色请求参数
  */
 export interface BatchSetUserRolesParams {
-  student_ids: string[]
-  role: 'user' | 'admin' | 'superadmin'
+  userRoles: Array<{
+    student_id: string
+    role: 'user' | 'admin' | 'superadmin'
+  }>
 }
 
 // ==================== 操作日志相关类型 ====================
@@ -1657,4 +1843,101 @@ export interface OperationLogInfo {
   user_agent: string
   created_at: string
   details?: Record<string, unknown>
+}
+
+// ==================== 定时任务相关类型 ====================
+
+/**
+ * 定时任务配置信息
+ */
+export interface TaskConfigInfo {
+  id: number
+  task_code: string
+  task_name: string
+  enabled: number // 0=禁用, 1=启用
+  cron_expr: string
+  last_run_at: string | null
+  last_result: string | null
+  remark: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 更新任务配置请求参数
+ */
+export interface UpdateTaskConfigParams {
+  enabled?: number
+  cron_expr?: string
+  remark?: string
+}
+
+/**
+ * 任务执行结果
+ */
+export interface TaskExecutionResult {
+  task_code: string
+  success: boolean
+  affected_rows: number
+  message: string
+  ran_at: string
+  exec_ms: number
+}
+
+/**
+ * 任务执行日志信息
+ */
+export interface TaskLogInfo {
+  id: number
+  task_code: string
+  task_name: string
+  started_at: string
+  finished_at: string
+  success: number // 0=失败, 1=成功
+  message: string
+  affected_rows: number
+  exec_ms: number
+  created_at: string
+}
+
+/**
+ * 任务日志查询参数
+ */
+export interface TaskLogQueryParams {
+  page?: number
+  pageSize?: number
+  task_code?: string
+  task_name?: string
+}
+
+/**
+ * 任务配置列表查询参数
+ */
+export interface TaskConfigQueryParams {
+  page?: number
+  pageSize?: number
+}
+
+/**
+ * 任务配置列表响应数据
+ */
+export interface TaskConfigListResponse {
+  list: TaskConfigInfo[]
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+  }
+}
+
+/**
+ * 任务日志列表响应数据
+ */
+export interface TaskLogListResponse {
+  list: TaskLogInfo[]
+  pagination: {
+    page: number
+    pageSize: number
+    total: number
+  }
 }

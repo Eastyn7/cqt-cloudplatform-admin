@@ -164,7 +164,6 @@ const isCollapsed = ref(false)
 const teamFlag = TeamFlag
 const teamEmblem = TeamEmblem
 const userStore = useUserStore()
-storeToRefs(userStore)
 
 const MENU_SECTIONS: MenuSection[] = [
   {
@@ -187,10 +186,10 @@ const MENU_SECTIONS: MenuSection[] = [
     key: 'user',
     type: 'submenu',
     label: '用户管理',
-    roles: ['superadmin'],
+    roles: ['admin', 'superadmin'],
     icon: UserFilled,
     children: [
-      { label: '用户列表', index: '/admin/user', roles: ['superadmin'] },
+      { label: '用户列表', index: '/admin/user', roles: ['admin', 'superadmin'] },
       { label: '权限管理', index: '/admin/permission', roles: ['superadmin'] },
     ],
   },
@@ -265,6 +264,17 @@ const MENU_SECTIONS: MenuSection[] = [
     icon: Tickets,
   },
   {
+    key: 'task',
+    type: 'submenu',
+    label: '定时任务',
+    roles: ['admin', 'superadmin'],
+    icon: Tickets,
+    children: [
+      { label: '任务配置', index: '/admin/task-config', roles: ['admin', 'superadmin'] },
+      { label: '执行日志', index: '/admin/task-logs', roles: ['admin', 'superadmin'] },
+    ],
+  },
+  {
     key: 'operation-log',
     type: 'item',
     label: '操作日志',
@@ -321,6 +331,8 @@ const breadcrumb = computed(() => {
     '/admin/milestone': '发展历程管理',
     '/admin/email-code': '邮箱验证码管理',
     '/admin/operation-log': '操作日志',
+    '/admin/task-config': '定时任务配置',
+    '/admin/task-logs': '定时任务执行日志',
   }
   return breadcrumbMap[path] || ''
 })

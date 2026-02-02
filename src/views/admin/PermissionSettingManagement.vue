@@ -71,7 +71,11 @@
             table-layout="auto"
             height="100%"
           >
-            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column label="序号" width="60" align="center">
+              <template #default="{ $index }">
+                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+              </template>
+            </el-table-column>
             <el-table-column prop="student_id" label="学号" min-width="120" />
             <el-table-column prop="name" label="姓名" min-width="100" />
             <el-table-column prop="email" label="邮箱" min-width="200" />
@@ -85,7 +89,7 @@
             <el-table-column label="操作" width="200" align="center" fixed="right">
               <template #default="{ row }">
                 <el-button
-                  v-if="isSuperAdmin && row.role !== 'superadmin'"
+                  v-if="isSuperAdmin && row.student_id !== currentStudentId"
                   type="danger"
                   link
                   size="small"
@@ -161,11 +165,11 @@
                     v-for="user in searchResults"
                     :key="user.student_id"
                     class="user-row"
-                    :class="{ 'selected': setAdminForm.selectedUserIds.includes(user.student_id) }"
+                    :class="{ 'selected': isUserSelected(user.student_id) }"
                   >
                     <div class="body-cell select-column">
                       <el-checkbox
-                        :model-value="setAdminForm.selectedUserIds.includes(user.student_id)"
+                        :model-value="isUserSelected(user.student_id)"
                         @change="handleSelectUser(user.student_id)"
                       />
                     </div>
@@ -192,15 +196,26 @@
             <el-form-item v-if="selectedUsers.length > 0" label="已选择用户">
               <div class="selected-users-container">
                 <div class="selected-users-list">
-                  <el-tag
+                  <div
                     v-for="user in selectedUsers"
                     :key="user.student_id"
-                    closable
-                    @close="removeSelectedUser(user.student_id)"
-                    class="selected-user-tag"
+                    class="selected-user-item"
                   >
-                    {{ user.name || user.student_id }}
-                  </el-tag>
+                    <div class="selected-user-info">
+                      <span class="selected-user-name">{{ user.name || user.student_id }}</span>
+                      <span class="selected-user-id">{{ user.student_id }}</span>
+                      <span class="selected-user-email">{{ user.email }}</span>
+                    </div>
+                    <div class="selected-user-role">
+                      <el-select v-model="user.targetRole" size="small" class="role-select">
+                        <el-option label="普通管理员" value="admin" />
+                        <el-option label="超级管理员" value="superadmin" />
+                      </el-select>
+                    </div>
+                    <el-button link type="danger" size="small" @click="removeSelectedUser(user.student_id)">
+                      移除
+                    </el-button>
+                  </div>
                 </div>
                 <div class="selected-count">
                   已选择 {{ selectedUsers.length }} 个用户
@@ -217,10 +232,10 @@
               <el-button
                 type="primary"
                 :loading="setAdminLoading"
-                :disabled="!setAdminForm.selectedUserIds.length"
+                :disabled="!selectedUsers.length"
                 @click="handleSetAdmin"
               >
-                确认设置 ({{ setAdminForm.selectedUserIds.length }})
+                确认设置 ({{ selectedUsers.length }})
               </el-button>
             </div>
           </div>
@@ -251,6 +266,7 @@ const appliedFilters = reactive({
 // 获取当前用户角色
 const currentRole = computed(() => localStorage.getItem('role') || '')
 const isSuperAdmin = computed(() => currentRole.value === 'superadmin')
+const currentStudentId = computed(() => localStorage.getItem('student_id') || '')
 
 const pagination = reactive({
   page: 1,
@@ -305,6 +321,7 @@ const fetchAdmins = async () => {
     const params = {
       page: pagination.page,
       pageSize: pagination.pageSize,
+      search: appliedFilters.keyword || undefined,
     }
     const response = await permissionApi.getAllAdmins(params)
     if (response.data?.list) {
@@ -331,62 +348,84 @@ const searchResults = ref<{
 
 const setAdminForm = reactive({
   searchQuery: '',
-  selectedUserIds: [] as string[],
 })
 
-// 计算属性：已选择的用户
-const selectedUsers = computed(() => {
-  return searchResults.value.filter(user => setAdminForm.selectedUserIds.includes(user.student_id))
+type SelectedUser = {
+  student_id: string
+  email: string
+  name: string | null
+  targetRole: 'admin' | 'superadmin'
+}
+
+const selectedUsers = ref<SelectedUser[]>([])
+const selectedUserIdSet = computed(() => new Set(selectedUsers.value.map(user => user.student_id)))
+
+const isUserSelected = (studentId: string) => {
+  return selectedUserIdSet.value.has(studentId)
+}
+
+const toSelectedUser = (user: { student_id: string; email: string; name: string | null; role: string }): SelectedUser => ({
+  student_id: user.student_id,
+  email: user.email,
+  name: user.name,
+  targetRole: user.role === 'superadmin' ? 'superadmin' : 'admin',
 })
 
 // 全选状态
 const isAllSelected = computed(() => {
-  return searchResults.value.length > 0 && setAdminForm.selectedUserIds.length === searchResults.value.length
+  return searchResults.value.length > 0 && searchResults.value.every(user => isUserSelected(user.student_id))
 })
 
 const isIndeterminate = computed(() => {
-  return setAdminForm.selectedUserIds.length > 0 && setAdminForm.selectedUserIds.length < searchResults.value.length
+  const selectedInResults = searchResults.value.filter(user => isUserSelected(user.student_id)).length
+  return selectedInResults > 0 && selectedInResults < searchResults.value.length
 })
 
 const openSetAdminDialog = () => {
   setAdminDialogVisible.value = true
   setAdminForm.searchQuery = ''
-  setAdminForm.selectedUserIds = []
   searchResults.value = []
+  selectedUsers.value = []
 }
 
 const handleAddDialogClosed = () => {
   setAdminForm.searchQuery = ''
-  setAdminForm.selectedUserIds = []
   searchResults.value = []
+  selectedUsers.value = []
 }
 
 // 处理全选
 const handleSelectAll = (val: boolean | string | number) => {
   const checked = Boolean(val)
   if (checked) {
-    setAdminForm.selectedUserIds = searchResults.value.map(user => user.student_id)
+    const existingIds = selectedUserIdSet.value
+    const newSelections: SelectedUser[] = searchResults.value
+      .filter(user => !existingIds.has(user.student_id))
+      .map(user => toSelectedUser(user))
+    selectedUsers.value = [...selectedUsers.value, ...newSelections]
   } else {
-    setAdminForm.selectedUserIds = []
+    const removeIds = new Set(searchResults.value.map(user => user.student_id))
+    selectedUsers.value = selectedUsers.value.filter(user => !removeIds.has(user.student_id))
   }
 }
 
 // 处理单个用户选择
 const handleSelectUser = (studentId: string) => {
-  const index = setAdminForm.selectedUserIds.indexOf(studentId)
+  const index = selectedUsers.value.findIndex(user => user.student_id === studentId)
   if (index > -1) {
-    setAdminForm.selectedUserIds.splice(index, 1)
-  } else {
-    setAdminForm.selectedUserIds.push(studentId)
+    selectedUsers.value.splice(index, 1)
+    return
+  }
+
+  const user = searchResults.value.find(item => item.student_id === studentId)
+  if (user) {
+    selectedUsers.value.push(toSelectedUser(user))
   }
 }
 
 // 移除已选择的用户
 const removeSelectedUser = (studentId: string) => {
-  const index = setAdminForm.selectedUserIds.indexOf(studentId)
-  if (index > -1) {
-    setAdminForm.selectedUserIds.splice(index, 1)
-  }
+  selectedUsers.value = selectedUsers.value.filter(user => user.student_id !== studentId)
 }
 
 // 搜索用户
@@ -408,18 +447,20 @@ const handleSearchUsers = async () => {
 
 // 设置管理员
 const handleSetAdmin = async () => {
-  if (!setAdminForm.selectedUserIds.length) {
+  if (!selectedUsers.value.length) {
     ElMessage.warning('请选择要设置的用户')
     return
   }
 
   setAdminLoading.value = true
   try {
-    // 批量设置管理员
-    for (const studentId of setAdminForm.selectedUserIds) {
-      await permissionApi.setAdmin({ student_id: studentId })
-    }
-    ElMessage.success(`成功设置 ${setAdminForm.selectedUserIds.length} 个用户为管理员`)
+    await permissionApi.batchSetUserRoles({
+      userRoles: selectedUsers.value.map(user => ({
+        student_id: user.student_id,
+        role: user.targetRole,
+      })),
+    })
+    ElMessage.success(`成功设置 ${selectedUsers.value.length} 个用户权限`)
     setAdminDialogVisible.value = false
     await fetchAdmins() // 刷新列表
   } catch (error) {
@@ -750,13 +791,51 @@ onMounted(() => {
 
 .selected-users-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 8px;
 }
 
-.selected-user-tag {
-  margin: 0;
+.selected-user-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background-color: #ffffff;
+}
+
+.selected-user-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.selected-user-name {
+  font-weight: 600;
+  color: #303133;
+}
+
+.selected-user-id {
+  font-size: 12px;
+  color: #909399;
+}
+
+.selected-user-email {
+  font-size: 12px;
+  color: #909399;
+  word-break: break-all;
+}
+
+.selected-user-role {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.role-select {
+  width: 140px;
 }
 
 .selected-count {

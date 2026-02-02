@@ -50,12 +50,21 @@
                 </el-form-item>
 
                 <el-form-item>
-                  <el-input
+                  <el-select
                     v-model="searchForm.category"
                     placeholder="活动类别"
                     clearable
-                    class="search-input"
-                  />
+                    filterable
+                    class="search-select"
+                  >
+                    <el-option label="全部" value="" />
+                    <el-option
+                      v-for="category in categoryOptions"
+                      :key="category"
+                      :label="category"
+                      :value="category"
+                    />
+                  </el-select>
                 </el-form-item>
 
                 <el-form-item>
@@ -90,7 +99,11 @@
 
         <div class="table-wrapper">
           <el-table :data="paginatedData" v-loading="loading" border stripe table-layout="auto">
-            <el-table-column type="index" label="序号" width="60" align="center" />
+              <el-table-column label="序号" width="60" align="center">
+                <template #default="{ $index }">
+                  {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+                </template>
+              </el-table-column>
             <el-table-column label="封面" width="250" align="center">
               <template #default="{ row }">
                 <el-image
@@ -124,6 +137,16 @@
             <el-table-column prop="category" label="类别" width="120" />
             <el-table-column prop="location" label="地点" min-width="160" />
             <el-table-column prop="service_hours" label="服务时长(h)" width="120" align="center" />
+            <el-table-column label="报名开始" width="180">
+              <template #default="{ row }">
+                <span>{{ dateUtil.formatTime(row.signup_start_time) || '' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="报名截止" width="180">
+              <template #default="{ row }">
+                <span>{{ dateUtil.formatTime(row.signup_end_time) || '' }}</span>
+              </template>
+            </el-table-column>
             <el-table-column prop="status" label="状态" width="100" align="center">
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.status)">{{ row.status }}</el-tag>
@@ -184,7 +207,20 @@
             <el-input v-model="detailForm.dept_name" disabled />
           </el-form-item>
           <el-form-item label="类别">
-            <el-input v-model="detailForm.category" />
+            <el-select
+              v-model="detailForm.category"
+              placeholder="请选择活动类别"
+              clearable
+              filterable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="category in categoryOptions"
+                :key="category"
+                :label="category"
+                :value="category"
+              />
+            </el-select>
           </el-form-item>
           <el-form-item label="地点">
             <el-input v-model="detailForm.location" />
@@ -194,6 +230,24 @@
               v-model="detailForm.service_hours"
               :min="0"
               :step="0.5"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="报名开始">
+            <el-date-picker
+              v-model="detailForm.signup_start_time"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              placeholder="请选择报名开始时间"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="报名截止">
+            <el-date-picker
+              v-model="detailForm.signup_end_time"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              placeholder="请选择报名截止时间"
               style="width: 100%"
             />
           </el-form-item>
@@ -348,7 +402,20 @@
           </el-select>
         </el-form-item>
         <el-form-item label="类别">
-          <el-input v-model="editForm.category" placeholder="如 校内活动 / 校外活动" />
+          <el-select
+            v-model="editForm.category"
+            placeholder="请选择活动类别"
+            clearable
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="category in categoryOptions"
+              :key="category"
+              :label="category"
+              :value="category"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="地点">
           <el-input v-model="editForm.location" placeholder="活动地点" />
@@ -358,6 +425,24 @@
             v-model="editForm.service_hours"
             :min="0"
             :step="0.5"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="报名开始">
+          <el-date-picker
+            v-model="editForm.signup_start_time"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="请选择报名开始时间"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="报名截止">
+          <el-date-picker
+            v-model="editForm.signup_end_time"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="请选择报名截止时间"
             style="width: 100%"
           />
         </el-form-item>
@@ -490,6 +575,7 @@ const dateUtil = useDate
 
 const loading = ref(false)
 const tableData = ref<ActivityInfo[]>([])
+const categoryOptions = ref<string[]>([])
 const departments = ref<DepartmentInfo[]>([])
 
 // 顶部搜索表单
@@ -663,6 +749,8 @@ const editForm = reactive<{
   cover_key: string
   location: string
   service_hours: number | null
+  signup_start_time: string | null
+  signup_end_time: string | null
   start_time: string | null
   end_time: string | null
   status: '草稿' | '进行中' | '已结束' | ''
@@ -677,6 +765,8 @@ const editForm = reactive<{
   cover_key: '',
   location: '',
   service_hours: null,
+  signup_start_time: null,
+  signup_end_time: null,
   start_time: null,
   end_time: null,
   status: '草稿',
@@ -693,6 +783,8 @@ const resetEditForm = () => {
   editForm.cover_key = ''
   editForm.location = ''
   editForm.service_hours = null
+  editForm.signup_start_time = null
+  editForm.signup_end_time = null
   editForm.start_time = null
   editForm.end_time = null
   editForm.status = '草稿'
@@ -711,6 +803,8 @@ const detailForm = reactive({
   cover_key: '',
   location: '',
   service_hours: null as number | null,
+  signup_start_time: null as string | null,
+  signup_end_time: null as string | null,
   start_time: null as string | null,
   end_time: null as string | null,
   status: '' as '草稿' | '进行中' | '已结束' | '',
@@ -728,6 +822,8 @@ const resetDetailForm = () => {
   detailForm.cover_key = ''
   detailForm.location = ''
   detailForm.service_hours = null
+  detailForm.signup_start_time = null
+  detailForm.signup_end_time = null
   detailForm.start_time = null
   detailForm.end_time = null
   detailForm.status = ''
@@ -757,6 +853,8 @@ const openDetail = async (row: ActivityInfo) => {
   }
   detailForm.location = row.location || ''
   detailForm.service_hours = row.service_hours ?? null
+  detailForm.signup_start_time = row.signup_start_time || null
+  detailForm.signup_end_time = row.signup_end_time || null
   detailForm.start_time = row.start_time || null
   detailForm.end_time = row.end_time || null
   detailForm.status = (row.status as '草稿' | '进行中' | '已结束') || ''
@@ -769,6 +867,8 @@ const openDetail = async (row: ActivityInfo) => {
       const detail = res.data as ActivityInfo & { created_at?: string; updated_at?: string }
       detailForm.created_at = detail.created_at || ''
       detailForm.updated_at = detail.updated_at || ''
+      detailForm.signup_start_time = detail.signup_start_time || detailForm.signup_start_time
+      detailForm.signup_end_time = detail.signup_end_time || detailForm.signup_end_time
       detailForm.cover_key =
         (detail as ActivityInfo & { cover_key?: string }).cover_key || detailForm.cover_key
       detailForm.cover_url = await buildCoverPreviewUrl(
@@ -784,6 +884,23 @@ const openDetail = async (row: ActivityInfo) => {
 // 保存详情
 const handleDetailSave = async () => {
   if (!detailForm.activity_id) return
+  const start = dateUtil.toDayjs(detailForm.start_time)
+  const end = dateUtil.toDayjs(detailForm.end_time)
+  const now = dateUtil.toDayjs(new Date())
+  if (detailForm.status === '进行中' && end && now && end.isBefore(now)) {
+    ElMessage.warning('结束时间已过，不能保存为进行中状态')
+    return
+  }
+  const signupStart = dateUtil.toDayjs(detailForm.signup_start_time)
+  const signupEnd = dateUtil.toDayjs(detailForm.signup_end_time)
+  if (signupStart && signupEnd && signupEnd.isBefore(signupStart)) {
+    ElMessage.warning('报名截止时间不能早于报名开始时间')
+    return
+  }
+  if (signupEnd && start && signupEnd.isAfter(start)) {
+    ElMessage.warning('报名截止时间不能晚于活动开始时间，请检查时间段')
+    return
+  }
   detailSaving.value = true
   try {
     const payload: UpdateActivityParams = {
@@ -793,6 +910,8 @@ const handleDetailSave = async () => {
       cover_key: detailForm.cover_key || undefined,
       location: detailForm.location || undefined,
       service_hours: detailForm.service_hours ?? undefined,
+      signup_start_time: detailForm.signup_start_time || undefined,
+      signup_end_time: detailForm.signup_end_time || undefined,
       start_time: detailForm.start_time || undefined,
       end_time: detailForm.end_time || undefined,
       status: detailForm.status || undefined,
@@ -831,6 +950,8 @@ const openEditDialog = async (row?: ActivityInfo) => {
     }
     editForm.location = row.location || ''
     editForm.service_hours = row.service_hours ?? null
+    editForm.signup_start_time = row.signup_start_time || null
+    editForm.signup_end_time = row.signup_end_time || null
     editForm.start_time = row.start_time || null
     editForm.end_time = row.end_time || null
     editForm.status = (row.status as '草稿' | '进行中' | '已结束') || '草稿'
@@ -851,6 +972,8 @@ const buildCreatePayload = (): CreateActivityParams => {
   if (editForm.cover_key) payload.cover_key = editForm.cover_key
   if (editForm.location) payload.location = editForm.location
   if (editForm.service_hours != null) payload.service_hours = editForm.service_hours
+  if (editForm.signup_start_time) payload.signup_start_time = editForm.signup_start_time
+  if (editForm.signup_end_time) payload.signup_end_time = editForm.signup_end_time
   if (editForm.start_time) payload.start_time = editForm.start_time
   if (editForm.end_time) payload.end_time = editForm.end_time
   if (editForm.status) payload.status = editForm.status
@@ -867,6 +990,8 @@ const buildUpdatePayload = (): UpdateActivityParams => {
   if (editForm.cover_key) payload.cover_key = editForm.cover_key
   if (editForm.location) payload.location = editForm.location
   if (editForm.service_hours != null) payload.service_hours = editForm.service_hours
+  if (editForm.signup_start_time) payload.signup_start_time = editForm.signup_start_time
+  if (editForm.signup_end_time) payload.signup_end_time = editForm.signup_end_time
   if (editForm.start_time) payload.start_time = editForm.start_time
   if (editForm.end_time) payload.end_time = editForm.end_time
   if (editForm.status) payload.status = editForm.status
@@ -877,6 +1002,24 @@ const buildUpdatePayload = (): UpdateActivityParams => {
 const handleEditSave = async () => {
   if (!editForm.activity_name.trim()) {
     ElMessage.warning('请填写活动名称')
+    return
+  }
+
+  const start = dateUtil.toDayjs(editForm.start_time)
+  const end = dateUtil.toDayjs(editForm.end_time)
+  const now = dateUtil.toDayjs(new Date())
+  if (editForm.status === '进行中' && end && now && end.isBefore(now)) {
+    ElMessage.warning('结束时间已过，不能保存为进行中状态')
+    return
+  }
+  const signupStart = dateUtil.toDayjs(editForm.signup_start_time)
+  const signupEnd = dateUtil.toDayjs(editForm.signup_end_time)
+  if (signupStart && signupEnd && signupEnd.isBefore(signupStart)) {
+    ElMessage.warning('报名截止时间不能早于报名开始时间')
+    return
+  }
+  if (signupEnd && start && signupEnd.isAfter(start)) {
+    ElMessage.warning('报名截止时间不能晚于活动开始时间，请检查时间段')
     return
   }
 
@@ -903,6 +1046,12 @@ const handleEditSave = async () => {
 
 const handleStatusChange = (row: ActivityInfo) => {
   const nextStatus = row.status === '草稿' ? '进行中' : row.status === '进行中' ? '已结束' : '草稿'
+  const end = dateUtil.toDayjs(row.end_time)
+  const now = dateUtil.toDayjs(new Date())
+  if (nextStatus === '进行中' && end && now && end.isBefore(now)) {
+    ElMessage.warning('结束时间已过，不能切换为进行中')
+    return
+  }
   ElMessageBox.confirm(`确定将活动状态切换为「${nextStatus}」吗？`, '确认', {
     type: 'warning',
   })
@@ -980,9 +1129,20 @@ const loadDepartments = async () => {
   }
 }
 
+const loadCategories = async () => {
+  if (categoryOptions.value.length) return
+  try {
+    const res = await activityApi.getCategories()
+    categoryOptions.value = res.data?.list || []
+  } catch (error) {
+    console.error('加载活动类别失败:', error)
+  }
+}
+
 onMounted(() => {
   loadData()
   loadDepartments()
+  loadCategories()
 })
 </script>
 

@@ -50,7 +50,7 @@
               </el-icon>
             </div>
             <div class="kpi-bottom">
-              <span class="kpi-label">较昨日</span>
+              <span class="kpi-label">较上一时间段</span>
               <div
                 class="kpi-trend"
                 :class="{
@@ -167,7 +167,8 @@
             </template>
             <el-table :data="upcomingActivities" border size="small">
               <el-table-column prop="title" label="活动" min-width="200" />
-              <el-table-column prop="date" label="日期" width="120" />
+              <el-table-column prop="startTime" label="开始时间" width="140" />
+              <el-table-column prop="endTime" label="结束时间" width="140" />
               <el-table-column prop="participants" label="目标人次" width="140" />
               <el-table-column label="状态" width="150">
                 <template #default="{ row }: { row: ActivityPlan }">
@@ -236,27 +237,17 @@ import type { Component } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { Calendar, DataLine, Trophy, UserFilled } from '@element-plus/icons-vue'
-import {
-  activityApi,
-  activityParticipantApi,
-  backboneMemberApi,
-  honorRecordApi,
-  userInfoApi,
-} from '@/utils/api'
+import { activityApi, backboneMemberApi, dashboardApi } from '@/utils/api'
 import type {
   ActivityInfo,
-  HonorRecordInfo,
-  StudentActivityRecord,
-  UserInfo,
   BackboneMemberTreeTerm,
+  DashboardDataResponse,
+  DashboardKpiBlock,
 } from '@/utils/api/types'
 import { message } from '@/utils/message'
-import { useDate } from '@/utils/date'
-
-const dateUtil = useDate
 
 // 定义时间范围类型
-type TimeRange = '30d' | '90d' | '1y'
+type TimeRange = '30d' | '90d' | '1y' | 'all'
 // 定义活动状态类型
 type ActivityStatus = 'draft' | 'ongoing' | 'ending'
 // 定义趋势方向类型
@@ -306,7 +297,8 @@ interface VolunteerProfile {
 // 活动计划接口（用于表格）
 interface ActivityPlan {
   title: string
-  date: string
+  startTime: string
+  endTime: string
   participants: number
   status: ActivityStatus
 }
@@ -316,10 +308,11 @@ const timeOptions: { label: string; value: TimeRange }[] = [
   { label: '近30天', value: '30d' },
   { label: '近90天', value: '90d' },
   { label: '今年以来', value: '1y' },
+  { label: '全部时间', value: 'all' },
 ]
 
 // 当前时间范围 ref
-const timeRange = ref<TimeRange>('30d')
+const timeRange = ref<TimeRange>('all')
 // 加载状态 ref
 const loading = ref(false)
 // 数据时间戳 ref
@@ -358,14 +351,8 @@ const topVolunteers = ref<VolunteerProfile[]>([])
 // 即将活动 ref
 const upcomingActivities = ref<ActivityPlan[]>([])
 
-// 用户数据 ref
-const users = ref<UserInfo[]>([])
-// 荣誉记录 ref
-const honors = ref<HonorRecordInfo[]>([])
-// 活动数据 ref
+// 活动数据 ref（用于地图与表格）
 const activities = ref<ActivityInfo[]>([])
-// 参与记录 ref
-const participants = ref<StudentActivityRecord[]>([])
 
 // 当前届次树形视图数据
 const currentTermTreeLoading = ref(false)
@@ -406,7 +393,7 @@ const volunteerListRef = ref<HTMLDivElement>()
 // 状态标签映射
 const statusLabel: Record<ActivityStatus, string> = {
   draft: '筹备中',
-  ongoing: '执行中',
+  ongoing: '进行中',
   ending: '已结束',
 }
 
@@ -431,25 +418,6 @@ const majorBarRef = ref<HTMLDivElement>()
 let volunteerChart: ECharts | null = null
 let activityChart: ECharts | null = null
 let majorChart: ECharts | null = null
-
-// 获取一天开始时间
-const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate())
-// 日期偏移函数
-const shiftDays = (base: Date, days: number) => {
-  const shifted = new Date(base)
-  shifted.setDate(shifted.getDate() + days)
-  return shifted
-}
-
-// 规范化活动状态
-const normalizeStatus = (status?: string | null): ActivityStatus => {
-  if (!status) return 'draft'
-  if (status.includes('草稿')) return 'draft'
-  if (status.includes('进行')) return 'ongoing'
-  if (status.includes('结束')) return 'ending'
-  if (status === 'ending' || status === 'ongoing' || status === 'draft') return status
-  return 'draft'
-}
 
 // 初始化图表实例
 const initCharts = () => {
@@ -573,219 +541,6 @@ const updateCharts = async () => {
   updateMajorChart()
 }
 
-// 计算趋势元数据（当前 vs 之前的变化）
-const buildTrendMeta = (
-  current: number,
-  previous: number
-): { trend: number | null; trendDirection: TrendDirection } => {
-  const safePrev = Math.max(previous, 0)
-  if (safePrev === 0) {
-    return { trend: current > 0 ? 100 : 0, trendDirection: current > 0 ? 'up' : null }
-  }
-  const diff = current - safePrev
-  if (diff === 0) return { trend: 0, trendDirection: null }
-  const percent = Number(((Math.abs(diff) / safePrev) * 100).toFixed(1))
-  return { trend: percent, trendDirection: diff > 0 ? 'up' : 'down' }
-}
-
-// 更新 KPI 卡片数据（计算总量和趋势）
-const updateKpiCards = () => {
-  const todayStart = startOfDay(new Date())
-  const yesterdayStart = shiftDays(todayStart, -1)
-
-  // 志愿者相关
-  const volunteerTotal = users.value.length
-  const volunteerNewToday = users.value.filter((user) =>
-    dateUtil.isBetween(user.account_created_at, yesterdayStart, todayStart)
-  ).length
-  const volunteerPrevious = volunteerTotal - volunteerNewToday
-
-  // 服务时长相关
-  const totalHours = users.value.reduce((sum, record) => sum + Number(record.total_hours ?? 0), 0)
-  const hoursToday = participants.value
-    .filter((record) => dateUtil.isBetween(record.created_at, yesterdayStart, todayStart))
-    .reduce((sum, record) => sum + (Number(record.service_hours) || 0), 0)
-  const hoursPrevious = totalHours - hoursToday
-
-  // 荣誉相关
-  const honorTotal = honors.value.length
-  const honorToday = honors.value.filter((honor) =>
-    dateUtil.isBetween(honor.issue_date || undefined, yesterdayStart, todayStart)
-  ).length
-  const honorPrevious = honorTotal - honorToday
-
-  // 活动相关
-  const ongoingActivities = activities.value.filter(
-    (activity) => normalizeStatus(activity.status) === 'ongoing'
-  )
-  const ongoingToday = ongoingActivities.filter((activity) =>
-    dateUtil.isBetween(activity.start_time || activity.created_at, yesterdayStart, todayStart)
-  ).length
-  const ongoingPrevious = ongoingActivities.length - ongoingToday
-
-  // 计算环比
-  const metrics: Record<
-    string,
-    {
-      value: number
-      trend: number | null
-      trendDirection: TrendDirection
-    }
-  > = {
-    volunteer: {
-      value: volunteerTotal,
-      ...buildTrendMeta(volunteerTotal, volunteerPrevious),
-    },
-    hours: {
-      value: Number(totalHours.toFixed(1)),
-      ...buildTrendMeta(totalHours, hoursPrevious),
-    },
-    honor: {
-      value: honorTotal,
-      ...buildTrendMeta(honorTotal, honorPrevious),
-    },
-    activities: {
-      value: ongoingActivities.length,
-      ...buildTrendMeta(ongoingActivities.length, ongoingPrevious),
-    },
-  }
-
-  // 更新 KPI 卡片数据
-  // kpiCards.value = baseKpiCards.map((card) => ({
-  //   ...card,
-  //   value: metrics[card.key]?.value ?? 0,
-  //   trend: metrics[card.key]?.trend ?? null,
-  //   trendDirection: metrics[card.key]?.trendDirection ?? null,
-  // }))
-  kpiCards.value.forEach((card) => {
-    const data = metrics[card.key]
-    if (data) {
-      card.value = data.value
-      card.trend = data.trend
-      card.trendDirection = data.trendDirection
-    }
-  })
-}
-
-// 构建志愿者趋势数据系列（根据时间范围分桶）
-const buildVolunteerTrendSeries = () => {
-  if (!participants.value.length) {
-    volunteerTrend.value = []
-    return
-  }
-  const now = new Date()
-  const totalDays = timeRange.value === '1y' ? 365 : timeRange.value === '90d' ? 90 : 30
-  const bucketCount = timeRange.value === '1y' ? 12 : timeRange.value === '90d' ? 9 : 6
-  const bucketSize = Math.ceil(totalDays / bucketCount)
-  const rangeStart = shiftDays(now, -totalDays)
-
-  const buckets = Array.from({ length: bucketCount }, (_, idx) => {
-    const start = shiftDays(rangeStart, idx * bucketSize)
-    const end = shiftDays(start, bucketSize)
-    const label = timeRange.value === '1y' ? `${start.getMonth() + 1}月` : `第${idx + 1}段`
-    return { label, start, end, signup: 0, attend: 0, hours: 0 }
-  })
-
-  participants.value.forEach((record) => {
-    const createdAt = dateUtil.parseDate(record.created_at)
-    const bucket = buckets.find((item) => dateUtil.isBetween(createdAt, item.start, item.end))
-    if (!bucket) return
-    bucket.signup += 1
-    if (record.signed_in === 1) {
-      bucket.attend += 1
-    }
-    bucket.hours += Number(record.service_hours) || 0
-  })
-
-  volunteerTrend.value = buckets.map((bucket) => ({
-    label: bucket.label,
-    signup: bucket.signup,
-    attend: bucket.attend,
-    hours: Number(bucket.hours.toFixed(1)),
-  }))
-}
-
-// 构建活动分布数据（按类别计数）
-const buildActivityDistribution = () => {
-  if (!activities.value.length) {
-    activityDistribution.value = []
-    return
-  }
-  const distribution = new Map<string, number>()
-  activities.value.forEach((activity) => {
-    const category = activity.category || '未分类'
-    distribution.set(category, (distribution.get(category) || 0) + 1)
-  })
-  activityDistribution.value = Array.from(distribution.entries()).map(([name, value]) => ({
-    name,
-    value,
-  }))
-}
-
-// 构建专业统计数据（时长和志愿者数）
-const buildMajorStats = () => {
-  if (!participants.value.length) {
-    majorHours.value = []
-    return
-  }
-  const stats = new Map<string, { hours: number; volunteers: Set<string> }>()
-  const majorLookup = new Map(
-    users.value.map((user) => [user.student_id, user.major || '未注明专业'])
-  )
-  participants.value.forEach((record) => {
-    const major = record.major || majorLookup.get(record.student_id) || '未注明专业'
-    const entry = stats.get(major) ?? { hours: 0, volunteers: new Set<string>() }
-    entry.hours += Number(record.service_hours) || 0
-    entry.volunteers.add(record.student_id)
-    stats.set(major, entry)
-  })
-  majorHours.value = Array.from(stats.entries()).map(([name, data]) => ({
-    name,
-    hours: Number(data.hours.toFixed(1)),
-    volunteers: data.volunteers.size,
-  }))
-}
-
-// 构建顶级志愿者数据（聚合时长、技能，按时长排序取前10）
-const buildTopVolunteers = () => {
-  if (!participants.value.length) {
-    topVolunteers.value = []
-    return
-  }
-  const skillMap = new Map(users.value.map((user) => [user.student_id, user.skill_tags]))
-  const majorMap = new Map(users.value.map((user) => [user.student_id, user.major || '未注明专业']))
-  const stats = new Map<
-    string,
-    { name: string; department: string; hours: number; skills: string[] }
-  >()
-
-  participants.value.forEach((record) => {
-    const existed = stats.get(record.student_id) || {
-      name: record.student_name,
-      department: record.major || majorMap.get(record.student_id) || '未注明专业',
-      hours: 0,
-      skills: [],
-    }
-    existed.hours += Number(record.service_hours) || 0
-    const tags = skillMap.get(record.student_id)
-    if (tags) {
-      existed.skills = tags
-        .split(',')
-        .map((tag) => tag.trim())
-        .filter(Boolean)
-    }
-    stats.set(record.student_id, existed)
-  })
-
-  topVolunteers.value = Array.from(stats.values())
-    .sort((a, b) => b.hours - a.hours)
-    .slice(0, 10)
-    .map((item) => ({
-      ...item,
-      hours: Number(item.hours.toFixed(1)),
-      skills: item.skills.length ? item.skills : ['综合服务'],
-    }))
-}
 
 // 限制显示标签数量
 const getDisplayTags = (tags: string[]) => tags.slice(0, MAX_VOLUNTEER_TAGS)
@@ -817,48 +572,6 @@ const updateVolunteerRender = async () => {
   }
 }
 
-// 构建即将活动数据（过滤未来活动、排序、映射）
-const buildUpcomingActivities = () => {
-  if (!activities.value.length) {
-    upcomingActivities.value = []
-    return
-  }
-  const now = new Date()
-  const participantCount = new Map<number, number>()
-  participants.value.forEach((record) => {
-    participantCount.set(record.activity_id, (participantCount.get(record.activity_id) || 0) + 1)
-  })
-  const futureList = activities.value
-    .filter((activity) => {
-      const start = dateUtil.parseDate(activity.start_time)
-      return !!start && start >= now
-    })
-    .sort(
-      (a, b) =>
-        (dateUtil.parseDate(a.start_time)?.getTime() ?? Number.MAX_SAFE_INTEGER) -
-        (dateUtil.parseDate(b.start_time)?.getTime() ?? Number.MAX_SAFE_INTEGER)
-    )
-    .slice(0, 4)
-
-  upcomingActivities.value = futureList.map((activity) => ({
-    title: activity.activity_name,
-    date: dateUtil.formatMonthDay(activity.start_time, '待定'),
-    participants: activity.recruitment_limit ?? participantCount.get(activity.activity_id) ?? 0,
-    status: normalizeStatus(activity.status),
-  }))
-}
-
-// 构建仪表盘视图（调用所有数据构建函数并更新图表）
-const buildDashboardViews = async () => {
-  updateKpiCards()
-  buildVolunteerTrendSeries()
-  buildActivityDistribution()
-  buildMajorStats()
-  buildTopVolunteers()
-  buildUpcomingActivities()
-  await updateCharts()
-}
-
 // 加载当前届次骨干成员树形视图数据
 const loadCurrentTermTree = async () => {
   currentTermTreeLoading.value = true
@@ -876,22 +589,57 @@ const loadCurrentTermTree = async () => {
   }
 }
 
-// 刷新仪表盘数据（异步获取 API 数据，处理错误，更新视图）
+// 将 Dashboard 聚合数据应用到前端状态
+const applyDashboardData = async (payload: DashboardDataResponse) => {
+  const { kpiMetrics, volunteerTrend: trend, activityDistribution: pie, majorStats, topVolunteers: topList, upcomingActivities: upcomingList } = payload
+
+  const kpiMap: Record<string, DashboardKpiBlock> = {
+    volunteer: kpiMetrics.volunteerCount,
+    hours: kpiMetrics.totalServiceHours,
+    honor: kpiMetrics.honorCount,
+    activities: kpiMetrics.ongoingActivityCount,
+  }
+
+  kpiCards.value.forEach((card) => {
+    const data = kpiMap[card.key]
+    if (data) {
+      card.value = data.value
+      card.trend = data.trend
+      card.trendDirection = data.trendDirection
+    }
+  })
+
+  volunteerTrend.value = trend
+  activityDistribution.value = pie
+  majorHours.value = majorStats.map((item) => ({
+    name: item.name,
+    hours: item.hours,
+    volunteers: item.volunteerCount,
+  }))
+  topVolunteers.value = topList
+  upcomingActivities.value = upcomingList
+
+  await updateCharts()
+}
+
+// 刷新仪表盘数据（调用后端聚合接口 + 活动列表用于地图）
 const refreshDashboardData = async () => {
   if (loading.value) return
   loading.value = true
   try {
-    const [usersRes, honorsRes, activitiesRes, participantsRes] = await Promise.all([
-      userInfoApi.getAllUsers(),
-      honorRecordApi.getAll(),
+    const [dashboardRes, activitiesRes] = await Promise.all([
+      dashboardApi.getDashboardData(timeRange.value),
       activityApi.getAll(),
-      activityParticipantApi.getAll(),
     ])
-    users.value = usersRes.data?.list ?? []
-    honors.value = honorsRes.data?.list ?? []
+
     activities.value = activitiesRes.data?.list ?? []
-    participants.value = participantsRes.data?.list ?? []
-    await buildDashboardViews()
+    const dashboardData = dashboardRes.data
+    if (!dashboardData) {
+      message.error('获取仪表盘数据为空，请稍后重试')
+      return
+    }
+
+    await applyDashboardData(dashboardData)
     dataTimestamp.value = new Date().toLocaleString()
   } catch (error) {
     console.error('仪表盘数据获取失败', error)
@@ -901,11 +649,9 @@ const refreshDashboardData = async () => {
   }
 }
 
-// 监听时间范围变化，更新趋势数据和图表
+// 监听时间范围变化，重新拉取数据
 watch(timeRange, async () => {
-  buildVolunteerTrendSeries()
-  await nextTick()
-  updateVolunteerChart()
+  await refreshDashboardData()
 })
 watch(topVolunteers, updateVolunteerRender, { immediate: true })
 

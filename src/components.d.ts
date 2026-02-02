@@ -16,6 +16,7 @@ declare module 'vue' {
     BackboneTreeView: typeof import('./components/admin/BackboneTreeView.vue')['default']
     BulkImportDialog: typeof import('./components/common/BulkImportDialog.vue')['default']
     ChongqingDrillMap: typeof import('./components/admin/ChongqingDrillMap.vue')['default']
+    ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElAvatar: typeof import('element-plus/es')['ElAvatar']
     ElBreadcrumb: typeof import('element-plus/es')['ElBreadcrumb']

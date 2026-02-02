@@ -78,7 +78,11 @@
             table-layout="auto"
             height="100%"
           >
-            <el-table-column type="index" label="序号" width="60" align="center" />
+            <el-table-column label="序号" width="60" align="center">
+              <template #default="{ $index }">
+                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+              </template>
+            </el-table-column>
             <el-table-column label="证书" width="250" align="center">
               <template #default="{ row }">
                 <el-image

@@ -49,7 +49,7 @@ const routes: RouteRecordRaw[] = [
         meta: {
           title: '用户管理',
           requiresAuth: true,
-          roles: ['superadmin'],
+          roles: ['admin', 'superadmin'],
         },
       },
       {
@@ -188,6 +188,26 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/admin/RecruitmentSeasonManagement.vue'),
         meta: {
           title: '报名通道管理',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'task-config',
+        name: 'admin-task-config',
+        component: () => import('../views/admin/TaskConfigManagement.vue'),
+        meta: {
+          title: '定时任务配置',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'task-logs',
+        name: 'admin-task-logs',
+        component: () => import('../views/admin/TaskLogsManagement.vue'),
+        meta: {
+          title: '定时任务执行日志',
           requiresAuth: true,
           roles: ['admin', 'superadmin'],
         },
