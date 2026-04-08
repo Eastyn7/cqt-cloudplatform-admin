@@ -28,8 +28,8 @@
           <el-card class="login-card" shadow="always">
             <template #header>
               <div class="login-header">
-                <h3>管理员登录</h3>
-                <p class="login-subtitle">请使用您的账号登录后台管理系统</p>
+                <h3>平台登录</h3>
+                <p class="login-subtitle">请使用您的账号登录志愿服务平台</p>
               </div>
             </template>
 
@@ -311,11 +311,6 @@ const handleLogin = async () => {
           return
         }
 
-        if (!ADMIN_ROLES.includes(userRole)) {
-          message.error('当前账号没有后台访问权限')
-          return
-        }
-
         // 保存 token 与用户信息
         localStorage.setItem('token', res.data.token)
         localStorage.setItem('role', userRole)
@@ -327,8 +322,11 @@ const handleLogin = async () => {
         }
 
         message.success('登录成功')
-        // 跳转到后台管理首页
-        router.push('/admin/dashboard')
+        if (ADMIN_ROLES.includes(userRole)) {
+          router.push('/admin/dashboard')
+        } else {
+          router.push('/user/dashboard')
+        }
       }
     } catch (error) {
       // 错误信息已在 request 拦截器中处理

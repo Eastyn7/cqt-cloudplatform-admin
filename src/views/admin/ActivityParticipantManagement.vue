@@ -298,7 +298,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Refresh } from '@element-plus/icons-vue'
-import { activityApi, activityParticipantApi } from '@/utils/api'
+import { activityAdminApi, activityParticipantApi } from '@/utils/api'
 import type { ActivityNameInfo, StudentActivityRecord } from '@/utils/api/types'
 import { useDate } from '@/utils/date'
 
@@ -393,14 +393,23 @@ const getActivityStatusLabel = (status: string): string => {
   return map[status] || status
 }
 
+const getActivityStatusById = (activityId?: number | null) => {
+  if (!activityId) return ''
+  const match = activityOptions.value.find((item) => item.activity_id === activityId)
+  return match?.status || ''
+}
+
 const getDisplayStatus = (record: {
+  activity_id?: number | null
   activity_status?: string | null
+  activityStatus?: string | null
   start_time?: string | null
   end_time?: string | null
 }): string => {
+  const status = record.activity_status || record.activityStatus || getActivityStatusById(record.activity_id)
   // 1. 优先用后端给的状态（英文 code 或中文）
-  if (record.activity_status) {
-    return getActivityStatusLabel(record.activity_status)
+  if (status) {
+    return getActivityStatusLabel(status)
   }
 
   // 2. 没有状态时，根据开始/结束时间简单推断
@@ -418,8 +427,8 @@ const getDisplayStatus = (record: {
     return '进行中'
   }
 
-  // 3. 实在推不出，就当草稿显示出来，避免整列空白
-  return '草稿'
+  // 3. 实在推不出，显示空值
+  return '-'
 }
 
 const getDisplayStatusType = (record: {
@@ -486,7 +495,8 @@ const openDetail = (row: StudentActivityRecord) => {
   detailVisible.value = true
   detailForm.record_id = row.record_id
   detailForm.activity_name = row.activity_name || ''
-  detailForm.activity_status = row.activity_status || ''
+  detailForm.activity_status =
+    row.activity_status || getActivityStatusById(row.activity_id) || ''
   detailForm.student_name = row.student_name || ''
   detailForm.student_id = row.student_id || ''
   detailForm.college = row.college || ''
@@ -725,7 +735,7 @@ const loadData = async () => {
 
 const loadActivities = async () => {
   try {
-    const res = await activityApi.getNames()
+    const res = await activityAdminApi.getNames()
     activityOptions.value = res.data?.list || []
   } catch (error) {
     console.error('加载活动列表失败:', error)

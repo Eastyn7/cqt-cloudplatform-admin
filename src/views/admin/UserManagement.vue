@@ -159,11 +159,14 @@
                 <el-tag :type="getRoleType(row.role)">{{ getRoleLabel(row.role) }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="220" align="center" fixed="right">
+            <el-table-column label="操作" width="280" align="center" fixed="right">
               <template #default="{ row }">
                 <el-button type="primary" link size="small" @click="openDetail(row)"
                   >查看详情</el-button
                 >
+                <el-button type="success" link size="small" @click="openPortrait(row)">
+                  查看画像
+                </el-button>
                 <el-button
                   v-if="isSuperAdmin"
                   type="danger"
@@ -507,6 +510,16 @@ const roleLabelMap: Record<UserInfo['role'], string> = {
   superadmin: '超级管理员',
 }
 const getRoleLabel = (role: UserInfo['role']) => roleLabelMap[role] || ''
+
+const openPortrait = (row: UserInfo) => {
+  if (!row.student_id) return
+  router.push({
+    path: '/admin/user-portrait',
+    query: {
+      student_id: row.student_id,
+    },
+  })
+}
 
 // 分页信息（当前页、每页条数、总数）
 const pagination = reactive({

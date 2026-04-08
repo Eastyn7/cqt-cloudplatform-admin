@@ -1941,3 +1941,304 @@ export interface TaskLogListResponse {
     total: number
   }
 }
+
+// ==================== 证书模板管理 ====================
+
+export type CertificateTemplateFieldAlign = 'left' | 'center' | 'right'
+export type CertificateTemplateFieldWeight = 'normal' | 'bold'
+export type CertificateTemplateUsage = 'service_hours' | string
+
+export interface CertificateTemplateField {
+  key: string
+  label: string
+  x: number
+  y: number
+  fontSize: number
+  align: CertificateTemplateFieldAlign
+  fontFamily: string
+  color: string
+  fontWeight: CertificateTemplateFieldWeight
+  text?: string
+}
+
+export interface CertificateTemplateInfo {
+  template_id: number
+  template_name: string
+  template_key: string
+  template_usage?: CertificateTemplateUsage
+  canvas_width: number
+  canvas_height: number
+  fields_json: CertificateTemplateField[] | string
+  enabled: number
+  created_at: string
+  updated_at: string
+}
+
+export interface CertificateTemplateQueryParams {
+  page?: number
+  pageSize?: number
+  keyword?: string
+  enabled?: number
+  template_usage?: CertificateTemplateUsage
+}
+
+export type CertificateTemplatePageResponse = PaginationResponse<CertificateTemplateInfo>
+export type CertificateTemplateListResponse = ListResponse<CertificateTemplateInfo>
+
+export interface CreateCertificateTemplateParams {
+  template_name: string
+  template_key: string
+  template_usage?: CertificateTemplateUsage
+  activate_now?: boolean
+  canvas_width: number
+  canvas_height: number
+  fields_json: CertificateTemplateField[]
+  enabled: number
+}
+
+export interface UpdateCertificateTemplateParams {
+  template_name?: string
+  template_key?: string
+  template_usage?: CertificateTemplateUsage
+  activate_now?: boolean
+  canvas_width?: number
+  canvas_height?: number
+  fields_json?: CertificateTemplateField[]
+  enabled?: number
+}
+
+export interface DeleteCertificateTemplateResponse {
+  message: string
+}
+
+export interface ActivateCertificateTemplateResponse {
+  template_id: number
+  template_usage?: CertificateTemplateUsage
+  enabled: number
+}
+
+// ==================== 服务时长证书 ====================
+
+export interface CertificateEligibilityResponse {
+  eligible: boolean
+  total_hours: number
+  threshold_hours: number
+  template_id?: number
+  reason?: string
+}
+
+export interface CertificatePreviewPayload {
+  name?: string
+  hours?: string
+  date?: string
+  issuer?: string
+  [key: string]: string | undefined
+}
+
+export interface CertificatePreviewResponse {
+  template_id: number
+  preview_key: string
+  preview_url: string
+  payload: CertificatePreviewPayload
+}
+
+export interface GenerateServiceCertificateParams {
+  student_id?: string
+  template_id?: number
+  payload?: CertificatePreviewPayload
+}
+
+export interface RevokeServiceCertificateParams {
+  reason?: string
+}
+
+export interface RevokeServiceCertificateResponse {
+  cert_id: number
+  cert_no?: string
+  status: 'revoked' | string
+  revoked_reason?: string
+  revoked_by?: string
+}
+
+export interface ServiceCertificateInfo {
+  cert_id: number
+  cert_no?: string
+  student_id: string
+  template_id?: number
+  total_hours?: number
+  issued_date?: string
+  certificate_key?: string
+  download_url?: string
+  status?: 'generated' | 'revoked' | string
+  revoked_reason?: string
+  revoked_by?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type ServiceCertificateListResponse = PaginationResponse<ServiceCertificateInfo>
+
+// ==================== 人物画像 ====================
+
+export interface PortraitProfile {
+  studentId: string
+  name: string
+  college?: string | null
+  major?: string | null
+  avatarKey?: string | null
+  skillTags: string[]
+  totalHours: number
+}
+
+export interface PortraitKpi {
+  totalHours: number
+  activityCount: number
+  attendanceRate: number
+  totalRecordsHours: number
+}
+
+export interface PortraitRadarItem {
+  name: string
+  value: number
+}
+
+export interface PortraitHeatmapItem {
+  date: string
+  value: number
+}
+
+export interface PortraitCategoryPieItem {
+  name: string
+  value: number
+}
+
+export interface PortraitRecentActivityItem {
+  activity_id: number
+  activity_name: string
+  category?: string | null
+  start_time: string
+  service_hours?: number | null
+}
+
+export type PortraitDimensionSource = 'custom' | 'default'
+
+export type PortraitDegradeReason =
+  | 'DIMENSION_QUERY_FAILED'
+  | 'NO_ENABLED_DIMENSIONS'
+  | 'INVALID_DIMENSION_CONFIG'
+  | string
+
+export interface PortraitMeta {
+  dimensionSource: PortraitDimensionSource
+  degraded: boolean
+  degradeReason?: PortraitDegradeReason | null
+}
+
+export interface UserPortraitData {
+  profile: PortraitProfile
+  kpi: PortraitKpi
+  radarData: PortraitRadarItem[]
+  calendarHeatmap: PortraitHeatmapItem[]
+  categoryPie: PortraitCategoryPieItem[]
+  recentActivities: PortraitRecentActivityItem[]
+  portraitMeta?: PortraitMeta
+}
+
+export interface GetUserPortraitParams {
+  student_id?: string
+}
+
+// ==================== 活动推荐 ====================
+
+export interface RecommendationProfile {
+  student_id: string
+  college?: string | null
+  major?: string | null
+  skill_tags: string[]
+}
+
+export interface RecommendationItem {
+  activity_id: number
+  activity_name: string
+  category?: string | null
+  start_time?: string | null
+  end_time?: string | null
+  signup_start_time?: string | null
+  signup_end_time?: string | null
+  location?: string | null
+  service_hours?: number | null
+  score: number
+  reasons: string[]
+}
+
+export interface MyRecommendationsResponse {
+  profile: RecommendationProfile
+  list: RecommendationItem[]
+  total: number
+}
+
+export interface RefreshRecommendationsParams {
+  student_id: string
+  limit?: number
+}
+
+export interface RecommendationRecord {
+  recommendation_id: number
+  student_id: string
+  activity_id: number
+  score: number
+  reasons: string[] | string
+  activity_name?: string | null
+  category?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export interface RecommendationPageParams {
+  page?: number
+  pageSize?: number
+  student_id?: string
+  activity_id?: number
+}
+
+export type RecommendationPageResponse = PaginationResponse<RecommendationRecord>
+
+export interface PortraitDimensionInfo {
+  dimension_id: number
+  dimension_code: string
+  dimension_name: string
+  keywords: string
+  weight: number
+  sort_order: number
+  enabled: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface CreatePortraitDimensionParams {
+  dimension_code: string
+  dimension_name: string
+  keywords: string
+  weight?: number
+  sort_order?: number
+  enabled?: number
+}
+
+export interface UpdatePortraitDimensionParams {
+  dimension_code?: string
+  dimension_name?: string
+  keywords?: string
+  weight?: number
+  sort_order?: number
+  enabled?: number
+}
+
+export interface PortraitDimensionPageParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  enabled?: number
+}
+
+export type PortraitDimensionPageResponse = PaginationResponse<PortraitDimensionInfo>
+export type PortraitDimensionListResponse = ListResponse<PortraitDimensionInfo>

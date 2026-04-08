@@ -147,6 +147,33 @@ import type {
   TaskConfigQueryParams,
   TaskConfigListResponse,
   TaskLogListResponse,
+  CertificateTemplatePageResponse,
+  CertificateTemplateListResponse,
+  CertificateTemplateQueryParams,
+  CertificateTemplateInfo,
+  CreateCertificateTemplateParams,
+  UpdateCertificateTemplateParams,
+  DeleteCertificateTemplateResponse,
+  ActivateCertificateTemplateResponse,
+  CertificateEligibilityResponse,
+  CertificatePreviewResponse,
+  GenerateServiceCertificateParams,
+  RevokeServiceCertificateParams,
+  RevokeServiceCertificateResponse,
+  ServiceCertificateInfo,
+  ServiceCertificateListResponse,
+  UserPortraitData,
+  GetUserPortraitParams,
+  MyRecommendationsResponse,
+  RefreshRecommendationsParams,
+  RecommendationPageParams,
+  RecommendationPageResponse,
+  PortraitDimensionInfo,
+  CreatePortraitDimensionParams,
+  UpdatePortraitDimensionParams,
+  PortraitDimensionPageParams,
+  PortraitDimensionPageResponse,
+  PortraitDimensionListResponse,
 } from './types'
 
 // ==================== OSS 相关 API ====================
@@ -564,17 +591,7 @@ export const backboneMemberApi = {
 
 // ==================== 志愿活动记录管理相关 API ====================
 
-export const activityApi = {
-  /**
-   * 创建志愿活动（管理员）
-   * admin / superadmin 可使用
-   * 创建一个新的志愿活动
-   */
-  create: (params: CreateActivityParams) =>
-    request.post<CreateActivityResponse>('/activities/create', params, {
-      showSuccess: true,
-    }),
-
+export const activityPublicApi = {
   /**
    * 获取志愿活动分页列表
    * 公开接口，获取志愿活动分页列表（关联部门、届次）
@@ -595,11 +612,6 @@ export const activityApi = {
     }),
 
   /**
-   * 获取活动名称列表（管理员筛选）
-   */
-  getNames: () => request.get<ActivityNameListResponse>('/activities/names'),
-
-  /**
    * 获取活动详情
    * 公开接口，获取单个志愿活动的详细信息
    * @param activity_id 活动主键ID
@@ -617,6 +629,38 @@ export const activityApi = {
     request.get<ActivityCategoryListResponse>('/public/activities/categories', {
       skipAuth: true, // 公共接口，不需要鉴权
     }),
+}
+
+export const activityAdminApi = {
+  /**
+   * 创建志愿活动（管理员）
+   * admin / superadmin 可使用
+   * 创建一个新的志愿活动
+   */
+  create: (params: CreateActivityParams) =>
+    request.post<CreateActivityResponse>('/activities/create', params, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 获取志愿活动分页列表（含草稿）
+   * admin / superadmin 可使用
+   */
+  getPage: (params?: { page?: number; pageSize?: number; search?: string; status?: string; category?: string }) =>
+    request.get<ActivityPageResponse>('/activities/page', {
+      params,
+    }),
+
+  /**
+   * 获取所有志愿活动（含草稿）
+   * admin / superadmin 可使用
+   */
+  getAll: () => request.get<ActivityListResponse>('/activities/list'),
+
+  /**
+   * 获取活动名称列表（管理员筛选）
+   */
+  getNames: () => request.get<ActivityNameListResponse>('/activities/names'),
 
   /**
    * 更新志愿活动（管理员）
@@ -1359,6 +1403,210 @@ export const taskApi = {
     request.get<TaskLogListResponse>(`/tasks/logs`, { params }),
 }
 
+// ==================== 证书模板管理 API ====================
+
+export const certificateTemplateApi = {
+  /**
+   * 获取证书模板列表（分页）
+   */
+  page: (params?: CertificateTemplateQueryParams) =>
+    request.get<CertificateTemplatePageResponse>('/certificate-templates/page', { params }),
+
+  /**
+   * 获取证书模板列表（全量）
+   */
+  list: (params?: CertificateTemplateQueryParams) =>
+    request.get<CertificateTemplateListResponse>('/certificate-templates/list', { params }),
+
+  /**
+   * 获取单个证书模板详情
+   * GET /certificate-templates/{template_id}
+   */
+  get: (templateId: number) =>
+    request.get<CertificateTemplateInfo>(`/certificate-templates/${templateId}`),
+
+  /**
+   * 新建证书模板
+   */
+  create: (data: CreateCertificateTemplateParams) =>
+    request.post<CertificateTemplateInfo>('/certificate-templates/create', data, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 更新证书模板
+   */
+  update: (templateId: number, data: UpdateCertificateTemplateParams) =>
+    request.put<CertificateTemplateInfo>(`/certificate-templates/update/${templateId}`, data, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 删除证书模板
+   */
+  remove: (templateId: number) =>
+    request.delete<DeleteCertificateTemplateResponse>(
+      `/certificate-templates/delete/${templateId}`,
+      {
+        showSuccess: true,
+      }
+    ),
+
+  /**
+   * 一键设为当前生效模板
+   * PUT /api/certificate-templates/activate/{template_id}
+   */
+  activate: (templateId: number) =>
+    request.put<ActivateCertificateTemplateResponse>(`/certificate-templates/activate/${templateId}`, {}, {
+      showSuccess: true,
+    }),
+}
+
+// ==================== 服务时长证书 API ====================
+
+export const serviceCertificateApi = {
+  /**
+   * 资格校验
+   */
+  eligibility: (params?: { student_id?: string; template_id?: number }) =>
+    request.get<CertificateEligibilityResponse>('/certificates/service-hours/eligibility', { params }),
+
+  /**
+   * 证书预览
+   */
+  preview: (params?: { student_id?: string; template_id?: number }) =>
+    request.get<CertificatePreviewResponse>('/certificates/service-hours/preview', { params }),
+
+  /**
+   * 生成正式证书
+   */
+  generate: (data: GenerateServiceCertificateParams) =>
+    request.post<ServiceCertificateInfo>('/certificates/service-hours/generate', data, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 证书列表
+   */
+  list: (params?: { page?: number; pageSize?: number; student_id?: string; status?: string }) =>
+    request.get<ServiceCertificateListResponse>('/certificates/service-hours/list', { params }),
+
+  /**
+   * 下载链接
+   */
+  download: (certId: number) =>
+    request.get<{ download_url: string }>(`/certificates/service-hours/download/${certId}`),
+
+  /**
+   * 作废证书（管理员）
+   * PUT /api/certificates/service-hours/revoke/{cert_id}
+   */
+  revoke: (certId: number, data?: RevokeServiceCertificateParams) =>
+    request.put<RevokeServiceCertificateResponse>(`/certificates/service-hours/revoke/${certId}`, data || {}, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 获取可用模板列表（管理员）
+   * GET /api/certificates/templates/list
+   */
+  getTemplatesList: (params?: { enabled?: number; template_usage?: string }) =>
+    request.get<{ list: CertificateTemplateInfo[]; total: number }>('/certificates/templates/list', { params }),
+
+  /**
+   * 下载模板原文件（管理员）
+   * GET /api/certificates/templates/download/{template_id}
+   */
+  downloadTemplate: (templateId: number) =>
+    request.get<{ template_id: number; template_name: string; template_key: string; download_url: string }>(`/certificates/templates/download/${templateId}`),
+}
+
+// ==================== 人物画像 API ====================
+
+export const portraitApi = {
+  /**
+   * 获取个人画像
+   * 普通用户默认查看自己；管理员可通过 student_id 查看指定用户
+   */
+  getPortrait: (params?: GetUserPortraitParams) =>
+    request.get<UserPortraitData>('/user/portrait', { params }),
+}
+
+export const recommendationsApi = {
+  /**
+   * 获取当前登录用户推荐活动
+   */
+  getMine: (params?: { limit?: number }) =>
+    request.get<MyRecommendationsResponse>('/recommendations/me', {
+      params,
+      showError: false,
+    }),
+
+  /**
+   * 管理员手动刷新指定用户推荐
+   */
+  refresh: (
+    data: RefreshRecommendationsParams,
+    options?: { showSuccess?: boolean; showError?: boolean }
+  ) =>
+    request.post<{ message: string }>('/recommendations/refresh', data, {
+      showSuccess: options?.showSuccess ?? true,
+      showError: options?.showError ?? true,
+    }),
+
+  /**
+   * 管理端分页查看推荐记录
+   */
+  page: (params?: RecommendationPageParams) =>
+    request.get<RecommendationPageResponse>('/recommendations/page', {
+      params,
+    }),
+}
+
+export const portraitDimensionsApi = {
+  /**
+   * 创建画像维度
+   */
+  create: (data: CreatePortraitDimensionParams) =>
+    request.post<PortraitDimensionInfo>('/portrait-dimensions/create', data, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 分页查询画像维度
+   */
+  page: (params?: PortraitDimensionPageParams) =>
+    request.get<PortraitDimensionPageResponse>('/portrait-dimensions/page', { params }),
+
+  /**
+   * 全量查询画像维度
+   */
+  list: (params?: { enabled?: number }) =>
+    request.get<PortraitDimensionListResponse>('/portrait-dimensions/list', { params }),
+
+  /**
+   * 获取单个画像维度
+   */
+  get: (dimensionId: number) =>
+    request.get<PortraitDimensionInfo>(`/portrait-dimensions/${dimensionId}`),
+
+  /**
+   * 更新画像维度
+   */
+  update: (dimensionId: number, data: UpdatePortraitDimensionParams) =>
+    request.put<PortraitDimensionInfo>(`/portrait-dimensions/update/${dimensionId}`, data, {
+      showSuccess: true,
+    }),
+
+  /**
+   * 删除画像维度
+   */
+  remove: (dimensionId: number) =>
+    request.delete<{ message: string }>(`/portrait-dimensions/delete/${dimensionId}`, {
+      showSuccess: true,
+    }),
+}
+
 // 导出所有 API
 export default {
   ossApi,
@@ -1370,7 +1618,8 @@ export default {
   departmentApi,
   teamTermApi,
   backboneMemberApi,
-  activityApi,
+  activityPublicApi,
+  activityAdminApi,
   activityParticipantApi,
   honorRecordApi,
   announcementApi,
@@ -1382,4 +1631,9 @@ export default {
   dashboardApi,
   permissionApi,
   taskApi,
+  certificateTemplateApi,
+  serviceCertificateApi,
+  recommendationsApi,
+  portraitApi,
+  portraitDimensionsApi,
 }

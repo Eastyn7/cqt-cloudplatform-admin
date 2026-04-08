@@ -237,7 +237,7 @@ import type { Component } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { Calendar, DataLine, Trophy, UserFilled } from '@element-plus/icons-vue'
-import { activityApi, backboneMemberApi, dashboardApi } from '@/utils/api'
+import { activityPublicApi, backboneMemberApi, dashboardApi } from '@/utils/api'
 import type {
   ActivityInfo,
   BackboneMemberTreeTerm,
@@ -629,7 +629,7 @@ const refreshDashboardData = async () => {
   try {
     const [dashboardRes, activitiesRes] = await Promise.all([
       dashboardApi.getDashboardData(timeRange.value),
-      activityApi.getAll(),
+      activityPublicApi.getAll(),
     ])
 
     activities.value = activitiesRes.data?.list ?? []

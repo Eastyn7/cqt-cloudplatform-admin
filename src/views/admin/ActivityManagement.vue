@@ -137,6 +137,11 @@
             <el-table-column prop="category" label="类别" width="120" />
             <el-table-column prop="location" label="地点" min-width="160" />
             <el-table-column prop="service_hours" label="服务时长(h)" width="120" align="center" />
+            <el-table-column prop="recruitment_limit" label="目标招募人数" width="120" align="center">
+              <template #default="{ row }">
+                <span>{{ row.recruitment_limit ?? '--' }}</span>
+              </template>
+            </el-table-column>
             <el-table-column label="报名开始" width="180">
               <template #default="{ row }">
                 <span>{{ dateUtil.formatTime(row.signup_start_time) || '' }}</span>
@@ -206,6 +211,22 @@
           <el-form-item label="部门">
             <el-input v-model="detailForm.dept_name" disabled />
           </el-form-item>
+          <el-form-item label="届次">
+            <el-select
+              v-model="detailForm.term_id"
+              placeholder="请选择届次"
+              clearable
+              filterable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="term in teamTerms"
+                :key="term.term_id"
+                :label="term.term_name"
+                :value="term.term_id"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item label="类别">
             <el-select
               v-model="detailForm.category"
@@ -230,6 +251,15 @@
               v-model="detailForm.service_hours"
               :min="0"
               :step="0.5"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="目标招募人数">
+            <el-input-number
+              v-model="detailForm.recruitment_limit"
+              :min="1"
+              :step="1"
+              :precision="0"
               style="width: 100%"
             />
           </el-form-item>
@@ -355,6 +385,9 @@
         </el-form>
 
         <el-descriptions border :column="1" class="detail-meta" title="其他信息">
+          <el-descriptions-item label="创建人学号">{{
+            detailForm.created_by || '--'
+          }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{
             dateUtil.format(detailForm.created_at) || '--'
           }}</el-descriptions-item>
@@ -401,6 +434,22 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="届次">
+          <el-select
+            v-model="editForm.term_id"
+            placeholder="请选择届次"
+            clearable
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="term in teamTerms"
+              :key="term.term_id"
+              :label="term.term_name"
+              :value="term.term_id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="类别">
           <el-select
             v-model="editForm.category"
@@ -425,6 +474,15 @@
             v-model="editForm.service_hours"
             :min="0"
             :step="0.5"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="目标招募人数">
+          <el-input-number
+            v-model="editForm.recruitment_limit"
+            :min="1"
+            :step="1"
+            :precision="0"
             style="width: 100%"
           />
         </el-form-item>
@@ -555,12 +613,13 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Refresh, Plus, Loading, Picture } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
-import { activityApi, departmentApi } from '@/utils/api'
+import { activityAdminApi, activityPublicApi, departmentApi, teamTermApi } from '@/utils/api'
 import type {
   ActivityInfo,
   CreateActivityParams,
   UpdateActivityParams,
   DepartmentInfo,
+  TeamTermInfo,
 } from '@/utils/api/types'
 import { useDate } from '@/utils/date'
 import {
@@ -577,6 +636,8 @@ const loading = ref(false)
 const tableData = ref<ActivityInfo[]>([])
 const categoryOptions = ref<string[]>([])
 const departments = ref<DepartmentInfo[]>([])
+const teamTerms = ref<TeamTermInfo[]>([])
+const currentStudentId = (localStorage.getItem('student_id') || '').trim()
 
 // 顶部搜索表单
 const searchForm = reactive({
@@ -626,6 +687,9 @@ const buildCoverPreviewUrl = async (
     return fallbackUrl
   }
 }
+
+const normalizeDateTime = (value?: string | null) =>
+  value ? dateUtil.formatTime(value) : null
 
 // 封面URL缓存（响应式）
 const coverUrlMap = reactive<Map<string, string>>(new Map())
@@ -744,11 +808,13 @@ const editForm = reactive<{
   activity_name: string
   dept_id: number | null
   dept_name: string
+  term_id: number | null
   category: string
   cover_url: string
   cover_key: string
   location: string
   service_hours: number | null
+  recruitment_limit: number | null
   signup_start_time: string | null
   signup_end_time: string | null
   start_time: string | null
@@ -760,11 +826,13 @@ const editForm = reactive<{
   activity_name: '',
   dept_id: null,
   dept_name: '',
+  term_id: null,
   category: '',
   cover_url: '',
   cover_key: '',
   location: '',
   service_hours: null,
+  recruitment_limit: null,
   signup_start_time: null,
   signup_end_time: null,
   start_time: null,
@@ -778,11 +846,13 @@ const resetEditForm = () => {
   editForm.activity_name = ''
   editForm.dept_id = null
   editForm.dept_name = ''
+  editForm.term_id = null
   editForm.category = ''
   editForm.cover_url = ''
   editForm.cover_key = ''
   editForm.location = ''
   editForm.service_hours = null
+  editForm.recruitment_limit = null
   editForm.signup_start_time = null
   editForm.signup_end_time = null
   editForm.start_time = null
@@ -798,17 +868,20 @@ const detailForm = reactive({
   activity_id: 0,
   activity_name: '',
   dept_name: '',
+  term_id: null as number | null,
   category: '',
   cover_url: '',
   cover_key: '',
   location: '',
   service_hours: null as number | null,
+  recruitment_limit: null as number | null,
   signup_start_time: null as string | null,
   signup_end_time: null as string | null,
   start_time: null as string | null,
   end_time: null as string | null,
   status: '' as '草稿' | '进行中' | '已结束' | '',
   description: '',
+  created_by: '',
   created_at: '',
   updated_at: '',
 })
@@ -817,17 +890,20 @@ const resetDetailForm = () => {
   detailForm.activity_id = 0
   detailForm.activity_name = ''
   detailForm.dept_name = ''
+  detailForm.term_id = null
   detailForm.category = ''
   detailForm.cover_url = ''
   detailForm.cover_key = ''
   detailForm.location = ''
   detailForm.service_hours = null
+  detailForm.recruitment_limit = null
   detailForm.signup_start_time = null
   detailForm.signup_end_time = null
   detailForm.start_time = null
   detailForm.end_time = null
   detailForm.status = ''
   detailForm.description = ''
+  detailForm.created_by = ''
   detailForm.created_at = ''
   detailForm.updated_at = ''
 }
@@ -837,6 +913,7 @@ const openDetail = async (row: ActivityInfo) => {
   detailForm.activity_id = row.activity_id
   detailForm.activity_name = row.activity_name || ''
   detailForm.dept_name = row.dept_name || ''
+  detailForm.term_id = row.term_id ?? null
   detailForm.category = row.category || ''
   detailForm.cover_key = row.cover_key || ''
   if (detailForm.cover_key) {
@@ -853,22 +930,31 @@ const openDetail = async (row: ActivityInfo) => {
   }
   detailForm.location = row.location || ''
   detailForm.service_hours = row.service_hours ?? null
-  detailForm.signup_start_time = row.signup_start_time || null
-  detailForm.signup_end_time = row.signup_end_time || null
-  detailForm.start_time = row.start_time || null
-  detailForm.end_time = row.end_time || null
+  detailForm.recruitment_limit = row.recruitment_limit ?? null
+  detailForm.signup_start_time = normalizeDateTime(row.signup_start_time)
+  detailForm.signup_end_time = normalizeDateTime(row.signup_end_time)
+  detailForm.start_time = normalizeDateTime(row.start_time)
+  detailForm.end_time = normalizeDateTime(row.end_time)
   detailForm.status = (row.status as '草稿' | '进行中' | '已结束') || ''
   detailForm.description = row.description || ''
+  detailForm.created_by = row.created_by || ''
 
   // 尝试获取详细信息
   try {
-    const res = await activityApi.getOne(row.activity_id)
+    const res = await activityPublicApi.getOne(row.activity_id)
     if (res.data) {
       const detail = res.data as ActivityInfo & { created_at?: string; updated_at?: string }
       detailForm.created_at = detail.created_at || ''
       detailForm.updated_at = detail.updated_at || ''
-      detailForm.signup_start_time = detail.signup_start_time || detailForm.signup_start_time
-      detailForm.signup_end_time = detail.signup_end_time || detailForm.signup_end_time
+      detailForm.created_by = detail.created_by || detailForm.created_by
+      detailForm.signup_start_time =
+        normalizeDateTime(detail.signup_start_time) || detailForm.signup_start_time
+      detailForm.signup_end_time =
+        normalizeDateTime(detail.signup_end_time) || detailForm.signup_end_time
+      detailForm.start_time = normalizeDateTime(detail.start_time) || detailForm.start_time
+      detailForm.end_time = normalizeDateTime(detail.end_time) || detailForm.end_time
+      detailForm.term_id = detail.term_id ?? detailForm.term_id
+      detailForm.recruitment_limit = detail.recruitment_limit ?? detailForm.recruitment_limit
       detailForm.cover_key =
         (detail as ActivityInfo & { cover_key?: string }).cover_key || detailForm.cover_key
       detailForm.cover_url = await buildCoverPreviewUrl(
@@ -905,11 +991,13 @@ const handleDetailSave = async () => {
   try {
     const payload: UpdateActivityParams = {
       activity_name: detailForm.activity_name || undefined,
+      term_id: detailForm.term_id ?? undefined,
       category: detailForm.category || undefined,
       // 只向后端提交封面 key，URL 由前端按需生成
       cover_key: detailForm.cover_key || undefined,
       location: detailForm.location || undefined,
       service_hours: detailForm.service_hours ?? undefined,
+      recruitment_limit: detailForm.recruitment_limit ?? undefined,
       signup_start_time: detailForm.signup_start_time || undefined,
       signup_end_time: detailForm.signup_end_time || undefined,
       start_time: detailForm.start_time || undefined,
@@ -917,7 +1005,7 @@ const handleDetailSave = async () => {
       status: detailForm.status || undefined,
       description: detailForm.description || undefined,
     }
-    await activityApi.update(detailForm.activity_id, payload)
+    await activityAdminApi.update(detailForm.activity_id, payload)
     ElMessage.success('活动信息已更新')
     detailVisible.value = false
     resetDetailForm()
@@ -936,6 +1024,7 @@ const openEditDialog = async (row?: ActivityInfo) => {
     editForm.activity_name = row.activity_name
     editForm.dept_id = row.dept_id ?? null
     editForm.dept_name = row.dept_name || ''
+    editForm.term_id = row.term_id ?? null
     editForm.category = row.category || ''
     editForm.cover_key = row.cover_key || ''
     if (row.cover_key && coverUrlMap.has(row.cover_key)) {
@@ -950,10 +1039,11 @@ const openEditDialog = async (row?: ActivityInfo) => {
     }
     editForm.location = row.location || ''
     editForm.service_hours = row.service_hours ?? null
-    editForm.signup_start_time = row.signup_start_time || null
-    editForm.signup_end_time = row.signup_end_time || null
-    editForm.start_time = row.start_time || null
-    editForm.end_time = row.end_time || null
+    editForm.recruitment_limit = row.recruitment_limit ?? null
+    editForm.signup_start_time = normalizeDateTime(row.signup_start_time)
+    editForm.signup_end_time = normalizeDateTime(row.signup_end_time)
+    editForm.start_time = normalizeDateTime(row.start_time)
+    editForm.end_time = normalizeDateTime(row.end_time)
     editForm.status = (row.status as '草稿' | '进行中' | '已结束') || '草稿'
     editForm.description = row.description || ''
   } else {
@@ -967,17 +1057,20 @@ const buildCreatePayload = (): CreateActivityParams => {
     activity_name: editForm.activity_name.trim(),
   }
   if (editForm.dept_id != null) payload.dept_id = editForm.dept_id
+  if (editForm.term_id != null) payload.term_id = editForm.term_id
   if (editForm.category) payload.category = editForm.category
   // 只向后端提交封面 key
   if (editForm.cover_key) payload.cover_key = editForm.cover_key
   if (editForm.location) payload.location = editForm.location
   if (editForm.service_hours != null) payload.service_hours = editForm.service_hours
+  if (editForm.recruitment_limit != null) payload.recruitment_limit = editForm.recruitment_limit
   if (editForm.signup_start_time) payload.signup_start_time = editForm.signup_start_time
   if (editForm.signup_end_time) payload.signup_end_time = editForm.signup_end_time
   if (editForm.start_time) payload.start_time = editForm.start_time
   if (editForm.end_time) payload.end_time = editForm.end_time
   if (editForm.status) payload.status = editForm.status
   if (editForm.description) payload.description = editForm.description
+  if (currentStudentId) payload.created_by = currentStudentId
   return payload
 }
 
@@ -985,11 +1078,13 @@ const buildUpdatePayload = (): UpdateActivityParams => {
   const payload: UpdateActivityParams = {}
   if (editForm.activity_name) payload.activity_name = editForm.activity_name.trim()
   if (editForm.dept_id != null) payload.dept_id = editForm.dept_id
+  if (editForm.term_id != null) payload.term_id = editForm.term_id
   if (editForm.category) payload.category = editForm.category
   // 只向后端提交封面 key
   if (editForm.cover_key) payload.cover_key = editForm.cover_key
   if (editForm.location) payload.location = editForm.location
   if (editForm.service_hours != null) payload.service_hours = editForm.service_hours
+  if (editForm.recruitment_limit != null) payload.recruitment_limit = editForm.recruitment_limit
   if (editForm.signup_start_time) payload.signup_start_time = editForm.signup_start_time
   if (editForm.signup_end_time) payload.signup_end_time = editForm.signup_end_time
   if (editForm.start_time) payload.start_time = editForm.start_time
@@ -1027,11 +1122,11 @@ const handleEditSave = async () => {
   try {
     if (editForm.activity_id) {
       const payload = buildUpdatePayload()
-      await activityApi.update(editForm.activity_id, payload)
+      await activityAdminApi.update(editForm.activity_id, payload)
       ElMessage.success('活动已更新')
     } else {
       const payload = buildCreatePayload()
-      await activityApi.create(payload)
+      await activityAdminApi.create(payload)
       ElMessage.success('活动已创建')
     }
     editDialogVisible.value = false
@@ -1057,7 +1152,7 @@ const handleStatusChange = (row: ActivityInfo) => {
   })
     .then(async () => {
       try {
-        await activityApi.changeStatus(row.activity_id, { status: nextStatus })
+        await activityAdminApi.changeStatus(row.activity_id, { status: nextStatus })
         ElMessage.success('状态已更新')
         await loadData()
       } catch (error) {
@@ -1073,7 +1168,7 @@ const handleDelete = (row: ActivityInfo) => {
   })
     .then(async () => {
       try {
-        await activityApi.delete(row.activity_id)
+        await activityAdminApi.delete(row.activity_id)
         ElMessage.success('删除成功')
         await loadData()
       } catch (error) {
@@ -1093,7 +1188,7 @@ const loadData = async () => {
       status: appliedFilters.status || undefined,
       category: appliedFilters.category || undefined,
     }
-    const res = await activityApi.getPage(params)
+    const res = await activityAdminApi.getPage(params)
     if (res.data?.list) {
       const list = res.data.list
       // 加载列表时根据封面 key 生成临时访问 URL，并填充到coverUrlMap
@@ -1129,10 +1224,20 @@ const loadDepartments = async () => {
   }
 }
 
+const loadTeamTerms = async () => {
+  if (teamTerms.value.length) return
+  try {
+    const res = await teamTermApi.getAll()
+    teamTerms.value = res.data?.list || []
+  } catch (error) {
+    console.error('加载届次列表失败:', error)
+  }
+}
+
 const loadCategories = async () => {
   if (categoryOptions.value.length) return
   try {
-    const res = await activityApi.getCategories()
+    const res = await activityPublicApi.getCategories()
     categoryOptions.value = res.data?.list || []
   } catch (error) {
     console.error('加载活动类别失败:', error)
@@ -1142,6 +1247,7 @@ const loadCategories = async () => {
 onMounted(() => {
   loadData()
   loadDepartments()
+  loadTeamTerms()
   loadCategories()
 })
 </script>

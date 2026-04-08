@@ -31,29 +31,7 @@
                 boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
               }"
             >
-              <template v-for="section in filteredMenu" :key="section.key">
-                <el-menu-item v-if="section.type === 'item'" :index="section.index">
-                  <el-icon v-if="section.icon" class="menu-icon">
-                    <component :is="section.icon" />
-                  </el-icon>
-                  <span>{{ section.label }}</span>
-                </el-menu-item>
-                <el-sub-menu v-else :index="section.key">
-                  <template #title>
-                    <el-icon v-if="section.icon" class="menu-icon">
-                      <component :is="section.icon" />
-                    </el-icon>
-                    <span>{{ section.label }}</span>
-                  </template>
-                  <el-menu-item
-                    v-for="child in section.children"
-                    :key="child.index"
-                    :index="child.index"
-                  >
-                    {{ child.label }}
-                  </el-menu-item>
-                </el-sub-menu>
-              </template>
+              <AdminMenuNode v-for="section in filteredMenu" :key="section.key" :node="section" />
             </el-menu>
           </el-scrollbar>
           <div class="sidebar-footer">
@@ -77,7 +55,9 @@
             </el-button>
             <el-breadcrumb separator="/">
               <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-              <el-breadcrumb-item v-if="breadcrumb">{{ breadcrumb }}</el-breadcrumb-item>
+              <el-breadcrumb-item v-for="(label, idx) in breadcrumbLabels" :key="`${label}-${idx}`">
+                {{ label }}
+              </el-breadcrumb-item>
             </el-breadcrumb>
           </div>
           <div class="header-right">
@@ -98,7 +78,7 @@
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item disabled>当前账号：{{ displayName }}</el-dropdown-item>
-                  <el-dropdown-item @click="goProfile">个人中心</el-dropdown-item>
+                  <el-dropdown-item @click="goProfile">个人资料</el-dropdown-item>
                   <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -125,33 +105,31 @@ import {
   Document,
   Expand,
   Fold,
+  Medal,
   OfficeBuilding,
+  Picture,
   Tickets,
+  Timer,
   Trophy,
+  TrendCharts,
+  User,
   UserFilled,
 } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import TeamFlag from '@/assets/TeamFlag.jpg'
 import TeamEmblem from '@/assets/TeamEmblem.png'
+import AdminMenuNode from '@/components/admin/AdminMenuNode.vue'
 
 type Role = 'admin' | 'superadmin' | ''
 
-interface MenuItem {
-  label: string
-  index: string
-  roles: Role[]
-  icon?: Component
-}
-
-interface MenuSection {
+interface MenuNode {
   key: string
-  type: 'item' | 'submenu'
   label: string
-  index?: string
   roles: Role[]
+  index?: string
   icon?: Component
-  children?: MenuItem[]
+  children?: MenuNode[]
 }
 
 const route = useRoute()
@@ -165,141 +143,303 @@ const teamFlag = TeamFlag
 const teamEmblem = TeamEmblem
 const userStore = useUserStore()
 
-const MENU_SECTIONS: MenuSection[] = [
+const MENU_SECTIONS: MenuNode[] = [
   {
     key: 'dashboard',
-    type: 'item',
     label: '仪表盘',
     index: '/admin/dashboard',
     roles: ['admin', 'superadmin'],
     icon: DataLine,
   },
   {
-    key: 'profile',
-    type: 'item',
+    key: 'personal-certificate',
     label: '个人中心',
-    index: '/admin/profile',
     roles: ['admin', 'superadmin'],
-    icon: UserFilled,
+    icon: Medal,
+    children: [
+      {
+        key: 'profile',
+        label: '个人资料',
+        index: '/admin/profile',
+        roles: ['admin', 'superadmin'],
+        icon: UserFilled,
+      },
+      {
+        key: 'user-portrait',
+        label: '个人画像',
+        index: '/admin/user-portrait',
+        roles: ['admin', 'superadmin'],
+        icon: TrendCharts,
+      },
+      {
+        key: 'my-certificates',
+        label: '志愿时长证明',
+        index: '/admin/my-certificates',
+        roles: ['admin', 'superadmin'],
+        icon: Medal,
+      },
+    ],
   },
   {
     key: 'user',
-    type: 'submenu',
     label: '用户管理',
     roles: ['admin', 'superadmin'],
-    icon: UserFilled,
+    icon: User,
     children: [
-      { label: '用户列表', index: '/admin/user', roles: ['admin', 'superadmin'] },
-      { label: '权限管理', index: '/admin/permission', roles: ['superadmin'] },
+      {
+        key: 'user-list',
+        label: '用户列表',
+        index: '/admin/user',
+        roles: ['admin', 'superadmin'],
+        icon: User,
+      },
+      {
+        key: 'permission',
+        label: '权限管理',
+        index: '/admin/permission',
+        roles: ['superadmin'],
+        icon: UserFilled,
+      },
     ],
   },
   {
     key: 'organization',
-    type: 'submenu',
     label: '组织架构',
     roles: ['admin', 'superadmin'],
     icon: OfficeBuilding,
     children: [
-      { label: '部门管理', index: '/admin/department', roles: ['admin', 'superadmin'] },
-      { label: '届次管理', index: '/admin/team-term', roles: ['admin', 'superadmin'] },
-      { label: '骨干成员', index: '/admin/backbone-member', roles: ['admin', 'superadmin'] },
+      {
+        key: 'team-term',
+        label: '届次管理',
+        index: '/admin/team-term',
+        roles: ['admin', 'superadmin'],
+        icon: Calendar,
+      },
+      {
+        key: 'department',
+        label: '部门管理',
+        index: '/admin/department',
+        roles: ['admin', 'superadmin'],
+        icon: OfficeBuilding,
+      },
+      {
+        key: 'backbone-member',
+        label: '骨干成员',
+        index: '/admin/backbone-member',
+        roles: ['admin', 'superadmin'],
+        icon: UserFilled,
+      },
     ],
   },
   {
     key: 'recruitment',
-    type: 'submenu',
-    label: '报名管理',
+    label: '组织报名管理',
     roles: ['admin', 'superadmin'],
-    icon: Document,
+    icon: Tickets,
     children: [
-      { label: '报名列表', index: '/admin/recruitment', roles: ['admin', 'superadmin'] },
       {
+        key: 'recruitment-season',
         label: '报名通道',
         index: '/admin/recruitment-season',
         roles: ['admin', 'superadmin'],
+        icon: Tickets,
+      },
+      {
+        key: 'recruitment-list',
+        label: '报名列表',
+        index: '/admin/recruitment',
+        roles: ['admin', 'superadmin'],
+        icon: Tickets,
       },
     ],
   },
   {
     key: 'activity',
-    type: 'submenu',
     label: '活动管理',
     roles: ['admin', 'superadmin'],
     icon: Calendar,
     children: [
-      { label: '活动记录', index: '/admin/activity', roles: ['admin', 'superadmin'] },
       {
-        label: '活动参与',
+        key: 'activity-signup',
+        label: '活动报名',
+        index: '/admin/activity-signup',
+        roles: ['admin', 'superadmin'],
+        icon: Calendar,
+      },
+      {
+        key: 'activity-list',
+        label: '活动发布',
+        index: '/admin/activity',
+        roles: ['admin', 'superadmin'],
+        icon: Calendar,
+      },
+      {
+        key: 'activity-participant',
+        label: '活动参与记录',
         index: '/admin/activity-participant',
         roles: ['admin', 'superadmin'],
+        icon: Calendar,
+      },
+      {
+        key: 'recommendations',
+        label: '推荐记录',
+        index: '/admin/recommendations',
+        roles: ['admin', 'superadmin'],
+        icon: TrendCharts,
       },
     ],
   },
   {
-    key: 'honor',
-    type: 'item',
-    label: '荣誉管理',
-    index: '/admin/honor',
+    key: 'content',
+    label: '内容管理',
     roles: ['admin', 'superadmin'],
-    icon: Trophy,
+    icon: Picture,
+    children: [
+      {
+        key: 'news-content',
+        label: '资讯内容',
+        roles: ['admin', 'superadmin'],
+        icon: Document,
+        children: [
+          {
+            key: 'current-announcements',
+            label: '当前公告',
+            index: '/admin/current-announcements',
+            roles: ['admin', 'superadmin'],
+            icon: Document,
+          },
+          {
+            key: 'announcement',
+            label: '公告管理',
+            index: '/admin/announcement',
+            roles: ['admin', 'superadmin'],
+            icon: Document,
+          },
+          {
+            key: 'milestone',
+            label: '发展历程记录',
+            index: '/admin/milestone',
+            roles: ['admin', 'superadmin'],
+            icon: DataLine,
+          },
+        ],
+      },
+      {
+        key: 'resource-material',
+        label: '资源素材',
+        roles: ['admin', 'superadmin'],
+        icon: Picture,
+        children: [
+          {
+            key: 'gallery',
+            label: '组织相册',
+            index: '/admin/gallery',
+            roles: ['admin', 'superadmin'],
+            icon: Picture,
+          },
+          {
+            key: 'honor',
+            label: '荣誉记录',
+            index: '/admin/honor',
+            roles: ['admin', 'superadmin'],
+            icon: Trophy,
+          },
+          {
+            key: 'certificate-management',
+            label: '证书管理',
+            roles: ['admin', 'superadmin'],
+            icon: Medal,
+            children: [
+              {
+                key: 'certificate-templates',
+                label: '证书模版',
+                index: '/admin/certificate-templates',
+                roles: ['admin', 'superadmin'],
+                icon: Medal,
+              },
+              {
+                key: 'certificates',
+                label: '证书下载记录',
+                index: '/admin/certificates',
+                roles: ['admin', 'superadmin'],
+                icon: Medal,
+              },
+            ],
+          },
+          {
+            key: 'portrait-dimensions',
+            label: '画像维度管理',
+            index: '/admin/portrait-dimensions',
+            roles: ['admin', 'superadmin'],
+            icon: TrendCharts,
+          },
+        ],
+      },
+    ],
   },
   {
-    key: 'content',
-    type: 'submenu',
-    label: '内容管理',
+    key: 'system-settings',
+    label: '系统设置',
     roles: ['admin', 'superadmin'],
     icon: Document,
     children: [
-      { label: '公告通知', index: '/admin/announcement', roles: ['admin', 'superadmin'] },
-      { label: '团队相册', index: '/admin/gallery', roles: ['admin', 'superadmin'] },
-      { label: '发展历程', index: '/admin/milestone', roles: ['admin', 'superadmin'] },
+      {
+        key: 'email-code',
+        label: '邮箱验证码',
+        index: '/admin/email-code',
+        roles: ['admin', 'superadmin'],
+        icon: Document,
+      },
+      {
+        key: 'task',
+        label: '定时任务',
+        roles: ['admin', 'superadmin'],
+        icon: Timer,
+        children: [
+          {
+            key: 'task-config',
+            label: '任务配置',
+            index: '/admin/task-config',
+            roles: ['admin', 'superadmin'],
+            icon: Timer,
+          },
+          {
+            key: 'task-logs',
+            label: '执行日志',
+            index: '/admin/task-logs',
+            roles: ['admin', 'superadmin'],
+            icon: Medal,
+          },
+        ],
+      },
+      {
+        key: 'operation-log',
+        label: '操作日志',
+        index: '/admin/operation-log',
+        roles: ['superadmin'],
+        icon: Medal,
+      },
     ],
-  },
-  {
-    key: 'email-code',
-    type: 'item',
-    label: '邮箱验证码',
-    index: '/admin/email-code',
-    roles: ['admin', 'superadmin'],
-    icon: Tickets,
-  },
-  {
-    key: 'task',
-    type: 'submenu',
-    label: '定时任务',
-    roles: ['admin', 'superadmin'],
-    icon: Tickets,
-    children: [
-      { label: '任务配置', index: '/admin/task-config', roles: ['admin', 'superadmin'] },
-      { label: '执行日志', index: '/admin/task-logs', roles: ['admin', 'superadmin'] },
-    ],
-  },
-  {
-    key: 'operation-log',
-    type: 'item',
-    label: '操作日志',
-    index: '/admin/operation-log',
-    roles: ['superadmin'],
-    icon: Tickets,
   },
 ]
 
-const filteredMenu = computed<MenuSection[]>(() =>
-  MENU_SECTIONS.filter((section) => section.roles.includes(userRole.value))
-    .map((section) => {
-      if (section.type === 'submenu') {
-        const allowedChildren = (section.children ?? []).filter((child) =>
-          child.roles.includes(userRole.value)
-        )
-        return {
-          ...section,
-          children: allowedChildren,
-        }
+const hasChildren = (node: MenuNode): node is MenuNode & { children: MenuNode[] } =>
+  Array.isArray(node.children) && node.children.length > 0
+
+const filterMenuByRole = (nodes: MenuNode[], role: Role): MenuNode[] =>
+  nodes
+    .filter((node) => node.roles.includes(role))
+    .map((node) => {
+      if (!hasChildren(node)) return { ...node }
+      const children = filterMenuByRole(node.children, role)
+      return {
+        ...node,
+        children,
       }
-      return section
     })
-    .filter((section) => (section.type === 'submenu' ? (section.children?.length ?? 0) > 0 : true))
-)
+    .filter((node) => !hasChildren(node) || node.children.length > 0)
+
+const filteredMenu = computed<MenuNode[]>(() => filterMenuByRole(MENU_SECTIONS, userRole.value))
 
 const roleLabel = computed(() => {
   if (userRole.value === 'superadmin') return '超级管理员'
@@ -315,26 +455,27 @@ const displayName = computed(
 const userInitial = computed(() => displayName.value.charAt(0)?.toUpperCase() || '访')
 const userAvatar = computed(() => userStore.avatar)
 
-const breadcrumb = computed(() => {
-  const path = route.path
-  const breadcrumbMap: Record<string, string> = {
-    '/admin/dashboard': '仪表盘',
-    '/admin/user': '用户管理',
-    '/admin/department': '部门管理',
-    '/admin/team-term': '届次管理',
-    '/admin/backbone-member': '骨干成员管理',
-    '/admin/activity': '活动管理',
-    '/admin/activity-participant': '活动参与管理',
-    '/admin/honor': '荣誉管理',
-    '/admin/announcement': '公告管理',
-    '/admin/gallery': '相册管理',
-    '/admin/milestone': '发展历程管理',
-    '/admin/email-code': '邮箱验证码管理',
-    '/admin/operation-log': '操作日志',
-    '/admin/task-config': '定时任务配置',
-    '/admin/task-logs': '定时任务执行日志',
+const findMenuPathByRoute = (nodes: MenuNode[], path: string, trail: MenuNode[] = []): MenuNode[] | null => {
+  for (const node of nodes) {
+    const currentTrail = [...trail, node]
+    if (node.index === path) {
+      return currentTrail
+    }
+    if (hasChildren(node)) {
+      const nested = findMenuPathByRoute(node.children, path, currentTrail)
+      if (nested) return nested
+    }
   }
-  return breadcrumbMap[path] || ''
+  return null
+}
+
+const breadcrumbLabels = computed(() => {
+  const matched = findMenuPathByRoute(filteredMenu.value, route.path)
+  if (matched?.length) {
+    return matched.map((node) => node.label)
+  }
+  const title = typeof route.meta?.title === 'string' ? route.meta.title : ''
+  return title ? [title] : []
 })
 
 const handleLogout = () => {

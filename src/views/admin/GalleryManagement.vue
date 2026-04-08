@@ -524,7 +524,7 @@ import {
   Loading,
 } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
-import { galleryPhotoApi } from '@/utils/api'
+import { galleryPhotoApi, teamTermApi, activityAdminApi } from '@/utils/api'
 import type {
   GalleryPhotoInfo,
   CreateGalleryPhotoParams,
@@ -547,6 +547,7 @@ const loading = ref(false)
 const tableData = ref<GalleryPhotoInfo[]>([])
 const teamTerms = ref<TeamTermInfo[]>([])
 const activities = ref<ActivityInfo[]>([])
+const relationOptionsLoading = ref(false)
 const viewMode = ref<'list' | 'group'>('list')
 const imageUploading = ref(false)
 const imageProgress = ref(0)
@@ -910,6 +911,25 @@ const loadData = async () => {
   }
 }
 
+const loadRelationOptions = async (force = false) => {
+  if (relationOptionsLoading.value) return
+  if (!force && teamTerms.value.length > 0 && activities.value.length > 0) return
+
+  relationOptionsLoading.value = true
+  try {
+    const [termRes, activityRes] = await Promise.all([
+      teamTermApi.getAll(),
+      activityAdminApi.getAll(),
+    ])
+    teamTerms.value = termRes.data?.list || []
+    activities.value = activityRes.data?.list || []
+  } catch (error) {
+    console.error('加载届次/活动选项失败:', error)
+  } finally {
+    relationOptionsLoading.value = false
+  }
+}
+
 // 按活动分组
 const groupedByActivity = computed(() => {
   const groups = new Map<
@@ -1027,6 +1047,8 @@ const resetEditForm = () => {
 }
 
 const openEditDialog = async (row?: GalleryPhotoInfo) => {
+  await loadRelationOptions()
+
   if (row) {
     editForm.photo_id = row.photo_id
     editForm.image_key = row.image_key
@@ -1106,6 +1128,7 @@ const handleEditSave = async () => {
 
 onMounted(() => {
   loadData()
+  loadRelationOptions()
 })
 </script>
 

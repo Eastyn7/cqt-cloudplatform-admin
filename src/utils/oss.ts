@@ -205,7 +205,6 @@ export async function getSignedOssUrl(
     expires: expiresInSeconds,
     response: {
       'content-disposition': disposition,
-      // 不再覆盖 content-type，OSS 会使用对象元数据中的 Content-Type
       ...Object.fromEntries(
         Object.entries(responseHeaders).filter(([k]) => k.toLowerCase() !== 'content-type')
       ),

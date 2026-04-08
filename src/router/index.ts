@@ -43,6 +43,16 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'user-portrait',
+        name: 'admin-user-portrait',
+        component: () => import('../views/user/UserPortraitView.vue'),
+        meta: {
+          title: '人物画像',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
         path: 'user',
         name: 'admin-user',
         component: () => import('../views/admin/UserManagement.vue'),
@@ -113,6 +123,16 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'activity-signup',
+        name: 'admin-activity-signup',
+        component: () => import('../views/user/UserActivitiesView.vue'),
+        meta: {
+          title: '活动报名',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
         path: 'honor',
         name: 'admin-honor',
         component: () => import('../views/admin/HonorManagement.vue'),
@@ -133,6 +153,16 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'current-announcements',
+        name: 'admin-current-announcements',
+        component: () => import('../views/user/UserAnnouncementsView.vue'),
+        meta: {
+          title: '当前公告',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
         path: 'gallery',
         name: 'admin-gallery',
         component: () => import('../views/admin/GalleryManagement.vue'),
@@ -148,6 +178,36 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/admin/MilestoneManagement.vue'),
         meta: {
           title: '发展历程管理',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'certificate-templates',
+        name: 'admin-certificate-templates',
+        component: () => import('../views/admin/CertificateTemplateManagement.vue'),
+        meta: {
+          title: '证书模板管理',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'certificates',
+        name: 'admin-certificates',
+        component: () => import('../views/admin/ServiceCertificateManagement.vue'),
+        meta: {
+          title: '证书管理',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'my-certificates',
+        name: 'admin-my-certificates',
+        component: () => import('../views/user/UserCertificatesView.vue'),
+        meta: {
+          title: '我的志愿证书',
           requiresAuth: true,
           roles: ['admin', 'superadmin'],
         },
@@ -212,6 +272,107 @@ const routes: RouteRecordRaw[] = [
           roles: ['admin', 'superadmin'],
         },
       },
+      {
+        path: 'portrait-dimensions',
+        name: 'admin-portrait-dimensions',
+        component: () => import('../views/admin/PortraitDimensionManagement.vue'),
+        meta: {
+          title: '画像维度管理',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'recommendations',
+        name: 'admin-recommendations',
+        component: () => import('../views/admin/RecommendationManagement.vue'),
+        meta: {
+          title: '推荐管理',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+    ],
+  },
+  {
+    path: '/user',
+    component: () => import('../layouts/UserLayout.vue'),
+    redirect: '/user/dashboard',
+    meta: {
+      requiresAuth: true,
+      roles: ['user', 'admin', 'superadmin'],
+    },
+    children: [
+      {
+        path: 'dashboard',
+        name: 'user-dashboard',
+        component: () => import('../views/user/UserDashboardView.vue'),
+        meta: {
+          title: '数据驾驶舱',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'activities',
+        name: 'user-activities',
+        component: () => import('../views/user/UserActivitiesView.vue'),
+        meta: {
+          title: '活动报名',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'announcements',
+        name: 'user-announcements',
+        component: () => import('../views/user/UserAnnouncementsView.vue'),
+        meta: {
+          title: '公告通知',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'gallery',
+        name: 'user-gallery',
+        component: () => import('../views/user/UserGalleryView.vue'),
+        meta: {
+          title: '团队相册',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'certificates',
+        name: 'user-certificates',
+        component: () => import('../views/user/UserCertificatesView.vue'),
+        meta: {
+          title: '我的证书',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'profile',
+        name: 'user-profile',
+        component: () => import('../views/user/UserProfileView.vue'),
+        meta: {
+          title: '个人中心',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'portrait',
+        name: 'user-portrait',
+        component: () => import('../views/user/UserPortraitView.vue'),
+        meta: {
+          title: '人物画像',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
     ],
   },
   {
@@ -228,11 +389,6 @@ const router = createRouter({
 
 const ADMIN_ROLES = ['admin', 'superadmin']
 
-const hasAdminPermission = (role: string | null): boolean => {
-  if (!role) return false
-  return ADMIN_ROLES.includes(role)
-}
-
 // 全局路由守卫
 router.beforeEach((to, from, next) => {
   // 设置页面标题
@@ -247,12 +403,8 @@ router.beforeEach((to, from, next) => {
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
 
   if (requiresAuth) {
-    if (!token || !hasAdminPermission(role)) {
-      if (!token) {
-        message.warning('请先登录管理员账户')
-      } else {
-        message.error('当前账号没有后台访问权限')
-      }
+    if (!token) {
+      message.warning('请先登录账户')
       next('/')
       return
     }
@@ -264,15 +416,23 @@ router.beforeEach((to, from, next) => {
 
     if (matchedRoles.length > 0 && (!role || !matchedRoles.includes(role))) {
       message.error('当前账号无权访问该模块')
-      next('/admin/dashboard')
+      if (role && ADMIN_ROLES.includes(role)) {
+        next('/admin/dashboard')
+      } else {
+        next('/user/dashboard')
+      }
       return
     }
   }
 
-  // 如果已登录管理员账号，访问首页则跳转到后台
+  // 如果已登录账号，访问首页则跳转到对应入口
   if (to.path === '/') {
-    if (token && hasAdminPermission(role)) {
-      next('/admin/dashboard')
+    if (token && role) {
+      if (ADMIN_ROLES.includes(role)) {
+        next('/admin/dashboard')
+        return
+      }
+      next('/user/dashboard')
       return
     }
   }

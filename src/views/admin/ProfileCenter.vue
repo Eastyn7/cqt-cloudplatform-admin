@@ -74,7 +74,10 @@
           <template #header>
             <div class="card-header">
               <span>基本资料</span>
-              <small>与团队其他模块共享，请保持最新</small>
+              <div class="header-actions">
+                <small>与团队其他模块共享，请保持最新</small>
+                <el-button link type="primary" @click="goPortrait">查看人物画像</el-button>
+              </div>
             </div>
           </template>
           <el-form
@@ -187,6 +190,7 @@ import { Camera } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { emailApi, passwordApi, userInfoApi } from '@/utils/api'
 import type { UpdateUserInfoParams } from '@/utils/api/types'
 import {
@@ -200,6 +204,7 @@ import { useUserStore } from '@/stores/user'
 import { useDate } from '@/utils/date'
 
 const dateUtil = useDate
+const router = useRouter()
 
 const roleMap: Record<string, string> = {
   superadmin: '超级管理员',
@@ -293,6 +298,15 @@ const profileInitial = computed(() => profile.value?.name?.charAt(0) || '青')
 
 const sendCodeDisabled = computed(() => countdown.value > 0 || !passwordForm.email)
 const joinDateDisplay = computed(() => dateUtil.formatDate(profile.value?.join_date) || '-')
+
+const goPortrait = () => {
+  const currentRole = localStorage.getItem('role') || 'user'
+  if (currentRole === 'admin' || currentRole === 'superadmin') {
+    router.push('/admin/user-portrait')
+    return
+  }
+  router.push('/user/portrait')
+}
 
 const buildAvatarPreviewUrl = async (
   avatarKey?: string | null,
@@ -503,6 +517,13 @@ onBeforeUnmount(() => {
   font-weight: 400;
   color: #909399;
   font-size: 12px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .role-tag {
