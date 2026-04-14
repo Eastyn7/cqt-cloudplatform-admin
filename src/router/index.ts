@@ -283,11 +283,21 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'recommendation-strategy',
+        name: 'admin-recommendation-strategy',
+        component: () => import('../views/admin/RecommendationStrategyManagement.vue'),
+        meta: {
+          title: '推荐策略',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
         path: 'recommendations',
         name: 'admin-recommendations',
         component: () => import('../views/admin/RecommendationManagement.vue'),
         meta: {
-          title: '推荐管理',
+          title: '推荐审计',
           requiresAuth: true,
           roles: ['admin', 'superadmin'],
         },

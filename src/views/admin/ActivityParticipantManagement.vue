@@ -1,17 +1,92 @@
 <template>
-  <div class="activity-participant-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">活动参与管理</span>
-      </template>
-    </el-page-header>
+  <AdminPageLayout title="活动报名管理">
+    <div class="participant-management">
+      <el-card class="activity-card">
+        <template #header>
+          <div class="panel-header">
+            <el-select
+              v-model="selectedActivityId"
+              class="activity-search-input"
+              placeholder="搜索并选择活动"
+              clearable
+              filterable
+              @change="handleActivitySelect"
+            >
+              <el-option
+                v-for="activity in activityOptions"
+                :key="activity.activity_id"
+                :label="activity.activity_name"
+                :value="activity.activity_id"
+              />
+            </el-select>
+            <el-tag type="info" effect="plain">共 {{ activityOptions.length }} 场</el-tag>
+          </div>
+        </template>
 
-    <div class="content">
+        <el-scrollbar class="activity-scroll">
+          <div v-loading="activityLoading" class="activity-list">
+            <el-empty v-if="!activityOptions.length && !activityLoading" description="暂无活动" />
+            <div
+              v-for="activity in activityOptions"
+              :key="activity.activity_id"
+              :id="`activity-item-${activity.activity_id}`"
+              class="activity-item"
+              :class="{ active: selectedActivityId === activity.activity_id }"
+              @click="handleActivitySelect(activity.activity_id)"
+            >
+              <div class="activity-item-top">
+                <span class="activity-name">{{ activity.activity_name }}</span>
+                <el-tag size="small" :type="getActivityStatusType(activity.status)">
+                  {{ getActivityStatusLabel(activity.status) }}
+                </el-tag>
+              </div>
+              <div class="activity-item-meta">
+                <span>{{ activity.dept_name || '未关联部门' }}</span>
+                <span>{{ activity.term_name || '未关联届次' }}</span>
+              </div>
+              <div class="activity-item-meta secondary">
+                <span>报名 {{ dateUtil.formatTime(activity.signup_start_time) || '--' }} 至 {{ dateUtil.formatTime(activity.signup_end_time) || '--' }}</span>
+              </div>
+            </div>
+          </div>
+        </el-scrollbar>
+      </el-card>
+
       <el-card class="table-card">
         <template #header>
           <div class="card-header">
-            <div class="header-left">
-              <span class="card-title">参与记录列表</span>
+            <div class="header-top">
+              <div class="current-activity">
+                <span class="current-activity-name">
+                  {{ selectedActivity?.activity_name || '请从左侧选择活动' }}
+                </span>
+                <el-tag
+                  v-if="selectedActivity"
+                  size="small"
+                  :type="getActivityStatusType(selectedActivity.status)"
+                >
+                  {{ getActivityStatusLabel(selectedActivity.status) }}
+                </el-tag>
+              </div>
+              <div class="top-actions action-grid">
+                <el-button
+                  type="primary"
+                  :disabled="!selectedActivityId || loading"
+                  @click="handleExportParticipants"
+                >
+                  导出参与人员名单
+                </el-button>
+                <el-button
+                  type="success"
+                  :disabled="approveDisabled"
+                  @click="handleBulkApprove(true)"
+                >
+                  同意所选
+                </el-button>
+              </div>
+            </div>
+
+            <div class="header-filters">
               <el-form
                 :model="searchForm"
                 inline
@@ -22,7 +97,7 @@
                 <el-form-item>
                   <el-input
                     v-model="searchForm.keyword"
-                    placeholder="姓名 / 学号 / 学院"
+                    placeholder="姓名 / 学号 / 学院 / 专业"
                     clearable
                     @keyup.enter="handleSearch"
                     class="search-input"
@@ -33,23 +108,6 @@
                       </el-icon>
                     </template>
                   </el-input>
-                </el-form-item>
-
-                <el-form-item>
-                  <el-select
-                    v-model="searchForm.activity_id"
-                    placeholder="按活动筛选"
-                    clearable
-                    filterable
-                    class="search-select"
-                  >
-                    <el-option
-                      v-for="act in activityOptions"
-                      :key="act.activity_id"
-                      :label="act.activity_name"
-                      :value="act.activity_id"
-                    />
-                  </el-select>
                 </el-form-item>
 
                 <el-form-item>
@@ -97,35 +155,30 @@
                   </el-button>
                 </el-form-item>
               </el-form>
-            </div>
-            <div class="header-right">
-              <el-button
-                type="success"
-                :disabled="approveDisabled"
-                @click="handleBulkApprove(true)"
-              >
-                同意所选
-              </el-button>
-              <el-button
-                type="danger"
-                :disabled="approveDisabled"
-                @click="handleBulkApprove(false)"
-              >
-                拒绝所选
-              </el-button>
-              <el-divider direction="vertical" />
-              <el-button
-                type="info"
-                :disabled="signInDisabled"
-                @click="handleBulkSignIn"
-              >
-                批量签到
-              </el-button>
+
+              <div class="bottom-actions action-grid">
+                <el-button
+                  type="danger"
+                  :disabled="approveDisabled"
+                  @click="handleBulkApprove(false)"
+                >
+                  拒绝所选
+                </el-button>
+                <el-button
+                  type="info"
+                  :disabled="signInDisabled"
+                  @click="handleBulkSignIn"
+                >
+                  批量确认到场
+                </el-button>
+              </div>
             </div>
           </div>
         </template>
 
         <div class="table-wrapper">
+          <el-empty v-if="!selectedActivityId" description="请先从左侧选择一个活动" />
+          <template v-else>
             <el-table
               :data="paginatedData"
               v-loading="loading"
@@ -134,71 +187,75 @@
               table-layout="auto"
               @selection-change="handleSelectionChange"
             >
-            <el-table-column type="selection" width="50" align="center" fixed="left" />
-            <el-table-column label="序号" width="60" align="center">
-              <template #default="{ $index }">
-                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="activity_name" label="活动名称" min-width="200" />
-            <el-table-column prop="activity_status" label="活动状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getDisplayStatusType(row)">
-                  {{ getDisplayStatus(row) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="报名状态" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag :type="getSignupStatusType(row.status)">{{ row.status || '待审核' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="approval_reason" label="审核备注" min-width="160">
-              <template #default="{ row }">
-                <span>{{ row.approval_reason || '--' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="student_name" label="学生姓名" width="120" />
-            <el-table-column prop="student_id" label="学号" width="140" />
-            <el-table-column prop="college" label="学院" width="150" />
-            <el-table-column prop="service_hours" label="服务时长(h)" width="120" align="center" />
-            <el-table-column prop="signed_in" label="签到状态" width="110" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.signed_in ? 'success' : 'info'">
-                  {{ row.signed_in ? '已签到' : '未签到' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="220" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" link size="small" @click="openDetail(row)"
-                  >查看详情</el-button
-                >
-                <el-button type="success" link size="small" @click="handleSignIn(row)"
-                  >切换签到</el-button
-                >
-                <el-button type="warning" link size="small" @click="openHoursDialog(row)"
-                  >修改时长</el-button
-                >
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+              <el-table-column type="selection" width="50" align="center" fixed="left" />
+              <el-table-column label="序号" width="60" align="center">
+                <template #default="{ $index }">
+                  {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="报名状态" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="getSignupStatusType(row.status)">{{ row.status || '待审核' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="approval_reason" label="审核备注" min-width="160">
+                <template #default="{ row }">
+                  <span>{{ row.approval_reason || '--' }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="student_name" label="学生姓名" width="120" />
+              <el-table-column prop="student_id" label="学号" width="140" />
+              <el-table-column prop="college" label="学院" width="150" />
+              <el-table-column prop="major" label="专业" width="180">
+                <template #default="{ row }">
+                  <span>{{ row.major || '--' }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="性别" width="100" align="center">
+                <template #default="{ row }">
+                  <span>{{ getGenderText(row) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="service_hours" label="服务时长(h)" width="120" align="center" />
+              <el-table-column prop="signed_in" label="签到状态" width="110" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.signed_in ? 'success' : 'info'">
+                    {{ row.signed_in ? '已签到' : '未签到' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="220" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button type="primary" link size="small" @click="openDetail(row)">
+                    查看详情
+                  </el-button>
+                  <el-button type="success" link size="small" @click="handleSignIn(row)">
+                    确认到场
+                  </el-button>
+                  <el-button type="warning" link size="small" @click="openHoursDialog(row)">
+                    修改时长
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
 
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="pagination.page"
-            v-model:page-size="pagination.pageSize"
-            :total="pagination.total"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handlePageChange"
-          />
+            <div class="pagination-container">
+              <el-pagination
+                v-model:current-page="pagination.page"
+                v-model:page-size="pagination.pageSize"
+                :total="filteredTotal"
+                :page-sizes="[10, 20, 50, 100]"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="handleSizeChange"
+                @current-change="handlePageChange"
+              />
+            </div>
+          </template>
         </div>
       </el-card>
+    </div>
 
-      <!-- 详情 Drawer -->
+    <!-- 详情 Drawer -->
       <el-drawer
         v-model="detailVisible"
         title="参与记录详情"
@@ -257,7 +314,6 @@
           </span>
         </template>
       </el-drawer>
-    </div>
 
     <!-- 修改服务时长对话框 -->
     <el-dialog
@@ -291,57 +347,82 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { activityAdminApi, activityParticipantApi } from '@/utils/api'
-import type { ActivityNameInfo, StudentActivityRecord } from '@/utils/api/types'
+import type { ActivityInfo, StudentActivityRecord } from '@/utils/api/types'
 import { useDate } from '@/utils/date'
+import * as XLSX from 'xlsx'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
+const activityLoading = ref(false)
 const tableData = ref<StudentActivityRecord[]>([])
 const selectedRows = ref<StudentActivityRecord[]>([])
+const activityOptions = ref<ActivityInfo[]>([])
+const selectedActivityId = ref<number | null>(null)
 
 const pagination = reactive({
   page: 1,
   pageSize: 10,
-  total: 0,
 })
-
-const activityOptions = ref<ActivityNameInfo[]>([])
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 // 搜索表单
 const searchForm = reactive({
   keyword: '',
-  activity_id: '' as number | '',
   status: '',
   signed_in: '' as number | '',
 })
 
 const appliedFilters = reactive({
   keyword: '',
-  activity_id: '' as number | '',
-  activity_name: '',
   status: '',
   signed_in: '' as number | '',
 })
 
-// 移除前端过滤逻辑，现在搜索在后端进行
+const selectedActivity = computed(() => {
+  if (!selectedActivityId.value) return null
+  return activityOptions.value.find((item) => item.activity_id === selectedActivityId.value) || null
+})
 
-// 计算当前页应该显示的数据（直接使用后端分页的数据）
+const filteredData = computed(() => {
+  const keyword = appliedFilters.keyword.trim().toLowerCase()
+
+  return tableData.value.filter((row) => {
+    if (appliedFilters.status && (row.status || '待审核') !== appliedFilters.status) {
+      return false
+    }
+
+    if (appliedFilters.signed_in !== '' && row.signed_in !== appliedFilters.signed_in) {
+      return false
+    }
+
+    if (keyword) {
+      const target = [row.student_name, row.student_id, row.college, row.major]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      if (!target.includes(keyword)) {
+        return false
+      }
+    }
+
+    return true
+  })
+})
+
+const filteredTotal = computed(() => filteredData.value.length)
+
+// 当前页数据由前端过滤与分页决定
 const paginatedData = computed(() => {
-  return tableData.value
+  const start = (pagination.page - 1) * pagination.pageSize
+  return filteredData.value.slice(start, start + pagination.pageSize)
 })
 
 const approveDisabled = computed(() => {
@@ -351,9 +432,10 @@ const approveDisabled = computed(() => {
 })
 
 const signInDisabled = computed(() => {
-  if (!selectedRows.value.length) return true
-  // 只要有至少一条记录可以签到就启用按钮
-  return false
+  if (!selectedRows.value.length) {
+    return true
+  }
+  return selectedRows.value.every((row) => row.signed_in === 1)
 })
 
 // 移除前端分页监听，现在分页在后端进行
@@ -399,6 +481,10 @@ const getActivityStatusById = (activityId?: number | null) => {
   return match?.status || ''
 }
 
+const getGenderText = (row: StudentActivityRecord & { gender?: string | null }) => {
+  return row.gender || '--'
+}
+
 const getDisplayStatus = (record: {
   activity_id?: number | null
   activity_status?: string | null
@@ -406,7 +492,8 @@ const getDisplayStatus = (record: {
   start_time?: string | null
   end_time?: string | null
 }): string => {
-  const status = record.activity_status || record.activityStatus || getActivityStatusById(record.activity_id)
+  const status =
+    record.activity_status || record.activityStatus || getActivityStatusById(record.activity_id) || selectedActivity.value?.status
   // 1. 优先用后端给的状态（英文 code 或中文）
   if (status) {
     return getActivityStatusLabel(status)
@@ -441,22 +528,52 @@ const getDisplayStatusType = (record: {
 
 // 搜索
 const handleSearch = async () => {
+  if (!selectedActivityId.value) {
+    ElMessage.warning('请先从左侧选择活动')
+    return
+  }
+
   appliedFilters.keyword = searchForm.keyword
-  appliedFilters.activity_id = searchForm.activity_id
   appliedFilters.status = searchForm.status
   appliedFilters.signed_in = searchForm.signed_in
-  const target = activityOptions.value.find((a) => a.activity_id === searchForm.activity_id)
-  appliedFilters.activity_name = target?.activity_name || ''
   pagination.page = 1
-  await loadData()
 }
 
 const handleResetFilters = async () => {
   searchForm.keyword = ''
-  searchForm.activity_id = ''
   searchForm.status = ''
   searchForm.signed_in = ''
-  await handleSearch()
+  appliedFilters.keyword = ''
+  appliedFilters.status = ''
+  appliedFilters.signed_in = ''
+  pagination.page = 1
+}
+
+const handleActivitySelect = async (activityId: number | null) => {
+  if (!activityId) {
+    selectedActivityId.value = null
+    tableData.value = []
+    selectedRows.value = []
+    pagination.page = 1
+    return
+  }
+
+  if (selectedActivityId.value === activityId) {
+    return
+  }
+
+  selectedActivityId.value = activityId
+  pagination.page = 1
+  selectedRows.value = []
+  await loadData()
+  
+  // 滚动到选中的活动卡片
+  await nextTick(() => {
+    const element = document.getElementById(`activity-item-${activityId}`)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  })
 }
 
 // 详情抽屉相关
@@ -495,8 +612,7 @@ const openDetail = (row: StudentActivityRecord) => {
   detailVisible.value = true
   detailForm.record_id = row.record_id
   detailForm.activity_name = row.activity_name || ''
-  detailForm.activity_status =
-    row.activity_status || getActivityStatusById(row.activity_id) || ''
+  detailForm.activity_status = row.activity_status || selectedActivity.value?.status || getActivityStatusById(row.activity_id) || ''
   detailForm.student_name = row.student_name || ''
   detailForm.student_id = row.student_id || ''
   detailForm.college = row.college || ''
@@ -599,7 +715,7 @@ const handleBulkApprove = (approved: boolean) => {
 
 const handleBulkSignIn = () => {
   if (!selectedRows.value.length) {
-    ElMessage.warning('请先选择要签到的记录')
+    ElMessage.warning('请先选择要确认到场的记录')
     return
   }
 
@@ -640,6 +756,71 @@ const handleBulkSignIn = () => {
       }
     })
     .catch(() => {})
+}
+
+const buildApprovedExportRows = () => {
+  const approvedRows = tableData.value.filter((row) => (row.status || '待审核') === '已同意')
+
+  return approvedRows.map((row, index) => ({
+    序号: index + 1,
+    姓名: row.student_name || '',
+    学号: row.student_id || '',
+    学院: row.college || '',
+    专业: row.major || '',
+    签到: '',
+  }))
+}
+
+const exportRowsToExcel = (rows: Record<string, string | number>[], fileName: string) => {
+  const workbook = XLSX.utils.book_new()
+  const worksheet = XLSX.utils.json_to_sheet(rows)
+  const headers = Object.keys(rows[0] || {})
+
+  const getDisplayWidth = (value: unknown) => {
+    const text = String(value ?? '')
+    let width = 0
+    for (const char of text) {
+      // 中文、全角等字符在 Excel 中通常占更宽显示空间
+      width += /[^\x00-\xff]/.test(char) ? 2 : 1
+    }
+    return width
+  }
+
+  worksheet['!cols'] = headers.map((header) => {
+    const maxLength = rows.reduce((max, row) => {
+      const value = row[header]
+      const length = getDisplayWidth(value)
+      return Math.max(max, length)
+    }, getDisplayWidth(header))
+    return { wch: Math.min(Math.max(maxLength + 3, 10), 80) }
+  })
+  XLSX.utils.book_append_sheet(workbook, worksheet, '报名名单')
+  XLSX.writeFile(workbook, fileName)
+}
+
+const buildExportFileName = (suffix: string) => {
+  const date = new Date()
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const cleanName = (selectedActivity.value?.activity_name || '活动').replace(/[\\/:*?"<>|]/g, '_')
+  return `${cleanName}-${suffix}-${y}${m}${d}.xlsx`
+}
+
+const handleExportParticipants = () => {
+  if (!selectedActivityId.value) {
+    ElMessage.warning('请先从左侧选择活动')
+    return
+  }
+
+  const rows = buildApprovedExportRows()
+  if (!rows.length) {
+    ElMessage.warning('当前活动暂无审核通过的报名记录可导出')
+    return
+  }
+
+  exportRowsToExcel(rows, buildExportFileName('参与人员名单'))
+  ElMessage.success('参与人员名单已导出（仅审核通过）')
 }
 
 // 修改服务时长
@@ -700,30 +881,28 @@ const handleHoursSave = async () => {
 const handleSizeChange = async (size: number) => {
   pagination.pageSize = size
   pagination.page = 1
-  await loadData()
 }
 
 const handlePageChange = async (page: number) => {
   pagination.page = page
-  await loadData()
 }
 
 const loadData = async () => {
+  if (!selectedActivityId.value) {
+    tableData.value = []
+    selectedRows.value = []
+    return
+  }
+
   loading.value = true
   try {
-    const params = {
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      search: appliedFilters.keyword || undefined,
-      activity_name: appliedFilters.activity_name || undefined,
-      status: appliedFilters.status || undefined,
-      signed_in: appliedFilters.signed_in !== '' ? appliedFilters.signed_in : undefined,
-    }
-    const response = await activityParticipantApi.getAllPage(params)
+    const response = await activityParticipantApi.getList(selectedActivityId.value)
     if (response.data?.list) {
-      tableData.value = response.data.list
-      pagination.total = response.data.pagination.total
+      tableData.value = response.data.list as unknown as StudentActivityRecord[]
       selectedRows.value = []
+      if ((pagination.page - 1) * pagination.pageSize >= filteredTotal.value) {
+        pagination.page = 1
+      }
     }
   } catch (error) {
     console.error('加载参与记录失败:', error)
@@ -735,48 +914,134 @@ const loadData = async () => {
 
 const loadActivities = async () => {
   try {
-    const res = await activityAdminApi.getNames()
-    activityOptions.value = res.data?.list || []
+    activityLoading.value = true
+    const res = await activityAdminApi.getAll()
+    activityOptions.value = (res.data?.list || []).slice().sort((left, right) => {
+      const leftRank = left.status === '进行中' || left.status === 'ongoing' ? 0 : left.status === '草稿' || left.status === 'draft' ? 2 : 1
+      const rightRank = right.status === '进行中' || right.status === 'ongoing' ? 0 : right.status === '草稿' || right.status === 'draft' ? 2 : 1
+      if (leftRank !== rightRank) return leftRank - rightRank
+      return (right.created_at || '').localeCompare(left.created_at || '')
+    })
+    const firstActivity = activityOptions.value[0]
+    if (!selectedActivityId.value && firstActivity) {
+      selectedActivityId.value = firstActivity.activity_id
+    }
   } catch (error) {
     console.error('加载活动列表失败:', error)
+  } finally {
+    activityLoading.value = false
   }
 }
 
-onMounted(() => {
-  loadData()
-  loadActivities()
+onMounted(async () => {
+  await loadActivities()
+  await loadData()
 })
 </script>
 
 <style scoped>
-.activity-participant-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  margin-top: 20px;
+  height: 100%;
+}
+
+.participant-management {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.activity-card {
+  width: 320px;
+  flex: 0 0 320px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.activity-card :deep(.el-card__body) {
+  flex: 1;
+  overflow: hidden;
+  padding: 0;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.activity-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-scroll {
+  height: 100%;
+}
+
+.activity-list {
+  padding: 12px;
+}
+
+.activity-item {
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.activity-item + .activity-item {
+  margin-top: 12px;
+}
+
+.activity-item:hover {
+  transform: translateY(-1px);
+  border-color: #c7d2fe;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.activity-item.active {
+  border-color: #409eff;
+  background: linear-gradient(180deg, rgba(64, 158, 255, 0.08), rgba(64, 158, 255, 0.03));
+  box-shadow: 0 10px 28px rgba(64, 158, 255, 0.15);
+}
+
+.activity-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.activity-name {
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.activity-item-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: #606266;
+}
+
+.activity-item-meta.secondary {
+  color: #909399;
 }
 
 .table-card :deep(.el-card__body) {
@@ -789,18 +1054,63 @@ onMounted(() => {
 
 .card-header {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.header-top {
+  display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
-.header-left {
+.header-filters {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+
+.header-filters .search-form {
   flex: 1;
   min-width: 0;
+}
+
+.top-actions,
+.bottom-actions {
+  flex: 0 0 auto;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.action-grid > .el-button {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.current-activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.current-activity-name {
+  font-weight: 600;
+  font-size: 16px;
 }
 
 .card-title {
@@ -813,8 +1123,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  flex: 1;
+  gap: 10px;
+  width: 100%;
   min-width: 0;
 }
 
@@ -824,13 +1134,13 @@ onMounted(() => {
 }
 
 .search-input {
-  width: 200px !important;
-  min-width: 200px;
+  width: 150px !important;
+  min-width: 150px;
 }
 
 .search-select {
-  width: 140px !important;
-  min-width: 120px;
+  width: 118px !important;
+  min-width: 118px;
 }
 
 .search-btn,
@@ -844,6 +1154,10 @@ onMounted(() => {
   flex: 1;
   overflow: hidden;
   padding: 16px;
+}
+
+.table-wrapper :deep(.el-empty) {
+  height: 100%;
 }
 
 .table-wrapper :deep(.el-table__row) {
@@ -889,12 +1203,31 @@ onMounted(() => {
 }
 
 @media (max-width: 1200px) {
-  .card-header {
+  .participant-management {
     flex-direction: column;
+    min-height: 0;
+  }
+
+  .activity-card {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .card-header {
     align-items: stretch;
   }
 
-  .header-left {
+  .header-top {
+    width: 100%;
+  }
+
+  .top-actions,
+  .bottom-actions {
+    width: 100%;
+  }
+
+  .action-grid {
+    max-width: none;
     width: 100%;
   }
 

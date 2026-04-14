@@ -1,12 +1,5 @@
 <template>
-  <div class="task-config-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">定时任务配置</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
+  <AdminPageLayout title="定时任务配置">
       <el-card class="table-card">
         <template #header>
           <div class="card-header">
@@ -105,7 +98,6 @@
           />
         </div>
       </el-card>
-    </div>
 
     <!-- Cron 表达式说明对话框 -->
     <el-dialog
@@ -193,7 +185,7 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -201,6 +193,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Timer, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import { taskApi } from '@/utils/api'
 import type { TaskConfigInfo } from '@/utils/api/types'
 import { formatDateTime } from '@/utils/date'
@@ -239,10 +232,6 @@ const cronExamples = [
   { expr: '0 */6 * * *', desc: '每 6 小时执行一次' },
   { expr: '0 0 * * *', desc: '每天午夜（00:00）执行' },
 ]
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 const handleViewLogs = () => {
   router.push('/admin/task-logs')
@@ -369,27 +358,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.task-config-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;

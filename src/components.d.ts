@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     AdminMenuNode: typeof import('./components/admin/AdminMenuNode.vue')['default']
+    AdminPageLayout: typeof import('./components/admin/AdminPageLayout.vue')['default']
     AuroraBackground: typeof import('./components/AuroraBackground.vue')['default']
     BackboneTreeView: typeof import('./components/admin/BackboneTreeView.vue')['default']
     BulkImportDialog: typeof import('./components/common/BulkImportDialog.vue')['default']
@@ -57,6 +58,7 @@ declare module 'vue' {
     ElRadio: typeof import('element-plus/es')['ElRadio']
     ElRadioButton: typeof import('element-plus/es')['ElRadioButton']
     ElRadioGroup: typeof import('element-plus/es')['ElRadioGroup']
+    ElRate: typeof import('element-plus/es')['ElRate']
     ElResult: typeof import('element-plus/es')['ElResult']
     ElRow: typeof import('element-plus/es')['ElRow']
     ElScrollbar: typeof import('element-plus/es')['ElScrollbar']

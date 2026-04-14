@@ -281,8 +281,15 @@ const MENU_SECTIONS: MenuNode[] = [
         icon: Calendar,
       },
       {
+        key: 'recommendation-strategy',
+        label: '推荐策略',
+        index: '/admin/recommendation-strategy',
+        roles: ['admin', 'superadmin'],
+        icon: TrendCharts,
+      },
+      {
         key: 'recommendations',
-        label: '推荐记录',
+        label: '推荐审计',
         index: '/admin/recommendations',
         roles: ['admin', 'superadmin'],
         icon: TrendCharts,

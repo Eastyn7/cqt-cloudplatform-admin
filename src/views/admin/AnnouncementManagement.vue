@@ -1,13 +1,6 @@
 <!-- eslint-disable vue/no-v-html -->
 <template>
-  <div class="announcement-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">公告与通知</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
+  <AdminPageLayout title="公告与通知">
       <el-card class="table-card">
         <template #header>
           <div class="card-header">
@@ -296,8 +289,7 @@
           </span>
         </template>
       </el-drawer>
-    </div>
-
+ 
     <!-- 新增/编辑公告对话框 -->
     <el-dialog
       v-model="editDialogVisible"
@@ -457,14 +449,14 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { Search, Refresh, Plus, Document } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import { announcementApi, teamTermApi } from '@/utils/api'
 import type {
   AnnouncementInfo,
@@ -480,7 +472,6 @@ import {
   getSignedOssUrl,
 } from '@/utils/oss'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
@@ -533,10 +524,6 @@ const pagination = reactive({
   pageSize: 10,
   total: 0,
 })
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 const searchForm = reactive({
   keyword: '',
@@ -1040,35 +1027,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.announcement-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.announcement-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .search-input {
   width: 240px !important;
   min-width: 160px;

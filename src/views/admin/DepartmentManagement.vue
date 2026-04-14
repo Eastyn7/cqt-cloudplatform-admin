@@ -1,13 +1,6 @@
 <template>
-  <div class="department-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">部门管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
-      <el-card class="table-card">
+  <AdminPageLayout title="部门管理">
+    <el-card class="table-card">
         <template #header>
           <div class="card-header">
             <div class="header-left">
@@ -229,15 +222,14 @@
         </template>
       </el-dialog>
 
-      <BulkImportDialog
-        v-model="importDialogVisible"
-        :field-hints="importFieldHints"
-        :example="importExample"
-        :json-placeholder="jsonPlaceholder"
-        @import="handleImportRows"
-      />
-    </div>
-  </div>
+    <BulkImportDialog
+      v-model="importDialogVisible"
+      :field-hints="importFieldHints"
+      :example="importExample"
+      :json-placeholder="jsonPlaceholder"
+      @import="handleImportRows"
+    />
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -253,8 +245,8 @@ import type {
 import { useDate } from '@/utils/date'
 import BulkImportDialog from '@/components/common/BulkImportDialog.vue'
 import { normalizeImportValue, applyImportedEntries } from '@/utils/importHelpers'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
@@ -309,11 +301,6 @@ const paginatedData = computed(() => {
 })
 
 // 移除前端分页监听，现在分页在后端进行
-
-// 返回上一页或仪表盘
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 // 批量新增相关
 type BatchEntry = {

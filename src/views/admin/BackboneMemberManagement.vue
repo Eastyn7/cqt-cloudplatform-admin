@@ -1,13 +1,6 @@
 <template>
-  <div class="backbone-member-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">骨干成员管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
-      <el-card class="table-card">
+  <AdminPageLayout title="骨干成员管理">
+    <el-card class="table-card">
         <template #header>
           <div class="card-header">
             <div class="header-left">
@@ -20,9 +13,62 @@
                 class="search-form"
               >
                 <el-form-item>
+                  <el-select
+                    v-model="searchForm.termId"
+                    placeholder="选择届次"
+                    clearable
+                    filterable
+                    class="filter-select"
+                    @change="handleSearch"
+                  >
+                    <el-option
+                      v-for="term in teamTerms"
+                      :key="term.term_id"
+                      :label="`${term.term_name}${term.is_current ? '（当前）' : ''}`"
+                      :value="term.term_id"
+                    />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item>
+                  <el-select
+                    v-model="searchForm.deptId"
+                    placeholder="选择部门"
+                    clearable
+                    filterable
+                    class="filter-select"
+                    @change="handleSearch"
+                  >
+                    <el-option
+                      v-for="dept in departments"
+                      :key="dept.dept_id"
+                      :label="dept.dept_name"
+                      :value="dept.dept_id"
+                    />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item>
+                  <el-select
+                    v-model="searchForm.position"
+                    placeholder="选择身份"
+                    clearable
+                    class="filter-select"
+                    @change="handleSearch"
+                  >
+                    <el-option
+                      v-for="position in positionOptions"
+                      :key="position"
+                      :label="position"
+                      :value="position"
+                    />
+                  </el-select>
+                </el-form-item>
+
+                <el-form-item>
                   <el-input
                     v-model="searchForm.keyword"
-                    placeholder="学号 / 姓名 / 部门 / 职位 / 届次"
+                    placeholder="姓名 / 学号"
                     clearable
                     @keyup.enter="handleSearch"
                     class="search-input"
@@ -55,6 +101,14 @@
               </el-form>
             </div>
             <div class="header-right">
+              <el-button
+                type="success"
+                plain
+                :loading="exportingExcel"
+                @click="handleExportTermMembers"
+              >
+                导出当前届次成员
+              </el-button>
               <el-button type="primary" @click="openAddDialog">新增成员</el-button>
             </div>
           </div>
@@ -421,15 +475,14 @@
         </template>
       </el-dialog>
 
-      <BulkImportDialog
-        v-model="importDialogVisible"
-        :field-hints="importFieldHints"
-        :example="importExample"
-        :json-placeholder="jsonPlaceholder"
-        @import="handleImportRows"
-      />
-    </div>
-  </div>
+    <BulkImportDialog
+      v-model="importDialogVisible"
+      :field-hints="importFieldHints"
+      :example="importExample"
+      :json-placeholder="jsonPlaceholder"
+      @import="handleImportRows"
+    />
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -438,6 +491,7 @@ import type { TabPaneName, UploadFile } from 'element-plus'
 import { backboneMemberApi, departmentApi, teamTermApi } from '@/utils/api'
 import type {
   BackboneMemberInfo,
+  BackboneMemberPageParams,
   BackboneMemberTreeTerm,
   BatchCreateBackboneMemberParams,
   CreateBackboneMemberParams,
@@ -456,12 +510,11 @@ import {
   validateFileType,
   getSignedOssUrl,
 } from '@/utils/oss'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 
 const dateUtil = useDate
 
 type PositionOption = '队长' | '部长' | '副部长' | '部员'
-
-const router = useRouter()
 
 const loading = ref(false)
 const treeLoading = ref(false)
@@ -508,11 +561,19 @@ const getMemberInitial = (member: BackboneMemberInfo) => {
 
 const searchForm = reactive({
   keyword: '',
+  termId: null as number | null,
+  deptId: null as number | null,
+  position: '' as PositionOption | '',
 })
 
 const appliedFilters = reactive({
   keyword: '',
+  termId: null as number | null,
+  deptId: null as number | null,
+  position: '' as PositionOption | '',
 })
+
+const exportingExcel = ref(false)
 
 const pagination = reactive({
   page: 1,
@@ -528,10 +589,6 @@ const paginatedData = computed(() => {
 })
 
 // 移除前端分页监听，现在分页在后端进行
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 type BatchEntry = {
   student_id: string
@@ -730,15 +787,79 @@ const handleDetailSave = async () => {
   }
 }
 
+const ensureDefaultCurrentTerm = () => {
+  if (searchForm.termId) return
+  const currentTerm = teamTerms.value.find((term) => term.is_current === 1)
+  if (!currentTerm) return
+  searchForm.termId = currentTerm.term_id
+  appliedFilters.termId = currentTerm.term_id
+}
+
 const handleSearch = async () => {
-  appliedFilters.keyword = searchForm.keyword
+  appliedFilters.keyword = searchForm.keyword.trim()
+  appliedFilters.termId = searchForm.termId
+  appliedFilters.deptId = searchForm.deptId
+  appliedFilters.position = normalizePositionValue(searchForm.position)
   pagination.page = 1
   await loadData()
 }
 
 const handleResetFilters = async () => {
   searchForm.keyword = ''
+  searchForm.deptId = null
+  searchForm.position = ''
+  searchForm.termId = null
+  ensureDefaultCurrentTerm()
   await handleSearch()
+}
+
+const getTermNameById = (termId: number | null | undefined) => {
+  if (!termId) return ''
+  return teamTerms.value.find((term) => term.term_id === termId)?.term_name || ''
+}
+
+const triggerBlobDownload = (blob: Blob, filename: string) => {
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(objectUrl)
+}
+
+const handleExportTermMembers = async () => {
+  if (!appliedFilters.termId) {
+    ElMessage.warning('请先选择届次后再导出')
+    return
+  }
+  exportingExcel.value = true
+  try {
+    const { blob, filename } = await backboneMemberApi.exportExcel({
+      term_id: appliedFilters.termId,
+      dept_id: appliedFilters.deptId || undefined,
+      position: appliedFilters.position || undefined,
+      search: appliedFilters.keyword.trim() || undefined,
+    })
+    if (!blob.size) {
+      ElMessage.warning('暂无可导出的成员数据')
+      return
+    }
+    const termName = getTermNameById(appliedFilters.termId) || `term-${appliedFilters.termId}`
+    const fallbackFilename = `${termName}-骨干成员分部门-${dateUtil.formatDate(new Date()).replace(/-/g, '')}.xlsx`
+    triggerBlobDownload(blob, filename || fallbackFilename)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出骨干成员失败:', error)
+    if (error instanceof Error) {
+      ElMessage.error(error.message || '导出失败，请稍后重试')
+    } else {
+      ElMessage.error('导出失败，请稍后重试')
+    }
+  } finally {
+    exportingExcel.value = false
+  }
 }
 
 const handleDelete = (row: BackboneMemberInfo) => {
@@ -1032,10 +1153,13 @@ const handlePageChange = async (page: number) => {
 const loadData = async () => {
   loading.value = true
   try {
-    const params = {
+    const params: BackboneMemberPageParams = {
       page: pagination.page,
       pageSize: pagination.pageSize,
       search: appliedFilters.keyword || undefined,
+      term_id: appliedFilters.termId || undefined,
+      dept_id: appliedFilters.deptId || undefined,
+      position: appliedFilters.position || undefined,
     }
     const res = await backboneMemberApi.getPage(params)
     if (res.data?.list) {
@@ -1052,9 +1176,10 @@ const loadData = async () => {
   }
 }
 
-onMounted(() => {
-  loadData()
-  loadDepartmentsAndTerms()
+onMounted(async () => {
+  await loadDepartmentsAndTerms()
+  ensureDefaultCurrentTerm()
+  await handleSearch()
 })
 </script>
 
@@ -1190,8 +1315,12 @@ onMounted(() => {
 }
 
 .search-input {
-  width: 280px !important;
-  min-width: 200px;
+  width: 220px !important;
+  min-width: 160px;
+}
+
+.filter-select {
+  width: 150px !important;
 }
 
 .position-select {
@@ -1368,6 +1497,10 @@ onMounted(() => {
     width: 100% !important;
     max-width: 100%;
     flex: 1;
+  }
+
+  .filter-select {
+    width: 100% !important;
   }
 }
 

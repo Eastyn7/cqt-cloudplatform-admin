@@ -1,13 +1,6 @@
 <template>
-  <div class="recruitment-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">报名管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
-      <el-card class="table-card">
+  <AdminPageLayout title="报名管理">
+    <el-card class="table-card">
         <template #header>
           <div class="card-header">
             <div class="header-left">
@@ -206,8 +199,7 @@
             @current-change="handlePageChange"
           />
         </div>
-      </el-card>
-    </div>
+    </el-card>
 
     <!-- 详情对话框 -->
     <el-dialog
@@ -369,12 +361,13 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { recruitmentApi, departmentApi } from '@/utils/api'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import type {
   TeamRecruitmentInfo,
   GetRecruitmentListParams,
@@ -385,7 +378,6 @@ import type {
 } from '@/utils/api/types'
 import { useDate } from '@/utils/date'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
@@ -498,10 +490,6 @@ const parseSkillTags = (tags: string | null): string[] => {
   } catch {
     return tags.split(',').map((t) => t.trim())
   }
-}
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
 }
 
 const handleSearch = () => {
@@ -700,27 +688,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.recruitment-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;

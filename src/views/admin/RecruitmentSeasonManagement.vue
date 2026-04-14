@@ -1,13 +1,6 @@
 <template>
-  <div class="recruitment-season-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">报名通道管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
-      <el-card class="table-card">
+  <AdminPageLayout title="报名通道管理">
+    <el-card class="table-card">
         <template #header>
           <div class="card-header">
             <div class="header-left">
@@ -99,8 +92,7 @@
             @current-change="handlePageChange"
           />
         </div>
-      </el-card>
-    </div>
+    </el-card>
 
     <!-- 开启新通道对话框 -->
     <el-dialog
@@ -160,11 +152,12 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { recruitmentSeasonApi } from '@/utils/api'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import type {
   RecruitmentSeasonInfo,
   OpenSeasonParams,
@@ -174,7 +167,6 @@ import type {
 import { useDate } from '@/utils/date'
 import type { FormInstance, FormRules } from 'element-plus'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
@@ -209,10 +201,6 @@ const addFormRules: FormRules = {
     { required: true, message: '请输入标题', trigger: 'blur' },
     { min: 4, max: 100, message: '标题长度在 4 到 100 个字符', trigger: 'blur' },
   ],
-}
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
 }
 
 const openAddDialog = () => {
@@ -349,27 +337,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.recruitment-season-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;

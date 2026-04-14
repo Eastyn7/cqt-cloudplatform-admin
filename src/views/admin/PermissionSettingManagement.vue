@@ -1,119 +1,112 @@
 <template>
-  <div class="permission-setting-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">权限设置管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
-      <el-card class="table-card">
-        <template #header>
-          <div class="card-header">
-            <div class="header-left">
-              <span class="card-title">管理员列表</span>
-              <el-form
-                :model="searchForm"
-                inline
-                label-width="0"
-                @submit.prevent
-                class="search-form"
-              >
-                <el-form-item>
-                  <el-input
-                    v-model="searchForm.keyword"
-                    placeholder="搜索学号或姓名"
-                    clearable
-                    @keyup.enter="handleSearch"
-                    class="search-input"
-                  >
-                    <template #prefix>
-                      <el-icon class="el-input__icon">
-                        <Search />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-
-                <el-form-item>
-                  <el-button type="primary" @click="handleSearch" class="search-btn">
-                    <el-icon>
+  <AdminPageLayout title="权限管理">
+    <el-card class="table-card">
+      <template #header>
+        <div class="card-header">
+          <div class="header-left">
+            <span class="card-title">管理员列表</span>
+            <el-form
+              :model="searchForm"
+              inline
+              label-width="0"
+              @submit.prevent
+              class="search-form"
+            >
+              <el-form-item>
+                <el-input
+                  v-model="searchForm.keyword"
+                  placeholder="搜索学号或姓名"
+                  clearable
+                  @keyup.enter="handleSearch"
+                  class="search-input"
+                >
+                  <template #prefix>
+                    <el-icon class="el-input__icon">
                       <Search />
                     </el-icon>
-                    查询
-                  </el-button>
-                </el-form-item>
+                  </template>
+                </el-input>
+              </el-form-item>
 
-                <el-form-item>
-                  <el-button @click="handleResetFilters" class="reset-btn">
-                    <el-icon>
-                      <Refresh />
-                    </el-icon>
-                    重置
-                  </el-button>
-                </el-form-item>
-              </el-form>
-            </div>
-            <div class="header-right">
-              <el-button v-if="isSuperAdmin" type="primary" @click="openSetAdminDialog">
-                设置管理员
-              </el-button>
-            </div>
-          </div>
-        </template>
-
-        <div class="table-wrapper">
-          <el-table
-            :data="paginatedData"
-            v-loading="loading"
-            border
-            stripe
-            table-layout="auto"
-            height="100%"
-          >
-            <el-table-column label="序号" width="60" align="center">
-              <template #default="{ $index }">
-                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="student_id" label="学号" min-width="120" />
-            <el-table-column prop="name" label="姓名" min-width="100" />
-            <el-table-column prop="email" label="邮箱" min-width="200" />
-            <el-table-column prop="role" label="角色" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.role === 'superadmin' ? 'danger' : 'warning'">
-                  {{ row.role === 'superadmin' ? '超级管理员' : '管理员' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button
-                  v-if="isSuperAdmin && row.student_id !== currentStudentId"
-                  type="danger"
-                  link
-                  size="small"
-                  @click="handleRemoveAdmin(row)"
-                >
-                  取消管理员
+              <el-form-item>
+                <el-button type="primary" @click="handleSearch" class="search-btn">
+                  <el-icon>
+                    <Search />
+                  </el-icon>
+                  查询
                 </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
+              </el-form-item>
 
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="pagination.page"
-            v-model:page-size="pagination.pageSize"
-            :total="pagination.total"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handlePageChange"
-          />
+              <el-form-item>
+                <el-button @click="handleResetFilters" class="reset-btn">
+                  <el-icon>
+                    <Refresh />
+                  </el-icon>
+                  重置
+                </el-button>
+              </el-form-item>
+            </el-form>
+          </div>
+          <div class="header-right">
+            <el-button v-if="isSuperAdmin" type="primary" @click="openSetAdminDialog">
+              设置管理员
+            </el-button>
+          </div>
         </div>
-      </el-card>
+      </template>
+
+      <div class="table-wrapper">
+        <el-table
+          :data="paginatedData"
+          v-loading="loading"
+          border
+          stripe
+          table-layout="auto"
+          height="100%"
+        >
+          <el-table-column label="序号" width="60" align="center">
+            <template #default="{ $index }">
+              {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="student_id" label="学号" min-width="120" />
+          <el-table-column prop="name" label="姓名" min-width="100" />
+          <el-table-column prop="email" label="邮箱" min-width="200" />
+          <el-table-column prop="role" label="角色" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.role === 'superadmin' ? 'danger' : 'warning'">
+                {{ row.role === 'superadmin' ? '超级管理员' : '管理员' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="isSuperAdmin && row.student_id !== currentStudentId"
+                type="danger"
+                link
+                size="small"
+                @click="handleRemoveAdmin(row)"
+              >
+                取消管理员
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </el-card>
 
       <!-- 设置管理员弹窗 -->
       <el-dialog
@@ -241,16 +234,14 @@
           </div>
         </template>
       </el-dialog>
-    </div>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { permissionApi } from '@/utils/api'
 import type { AdminInfo } from '@/utils/api/types'
-
-const router = useRouter()
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 
 const loading = ref(false)
 const tableData = ref<AdminInfo[]>([])
@@ -282,11 +273,6 @@ const paginatedData = computed(() => {
 })
 
 // 移除前端分页监听，现在分页在后端进行
-
-// 返回上一页或仪表盘
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 // 搜索
 const handleSearch = async () => {
@@ -523,28 +509,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.permission-setting-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;

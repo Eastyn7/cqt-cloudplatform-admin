@@ -1,13 +1,6 @@
 <template>
-  <div class="activity-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">志愿活动管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
-      <el-card class="table-card">
+  <AdminPageLayout title="志愿活动管理">
+    <el-card class="table-card">
         <template #header>
           <div class="card-header">
             <div class="header-left">
@@ -194,9 +187,9 @@
             @current-change="handlePageChange"
           />
         </div>
-      </el-card>
+    </el-card>
 
-      <!-- 详情 Drawer -->
+    <!-- 详情 Drawer -->
       <el-drawer
         v-model="detailVisible"
         title="活动详情与编辑"
@@ -405,7 +398,6 @@
           </span>
         </template>
       </el-drawer>
-    </div>
 
     <!-- 新增/编辑活动对话框 -->
     <el-dialog
@@ -605,12 +597,11 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import { Search, Refresh, Plus, Loading, Picture } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 import { activityAdminApi, activityPublicApi, departmentApi, teamTermApi } from '@/utils/api'
@@ -622,6 +613,7 @@ import type {
   TeamTermInfo,
 } from '@/utils/api/types'
 import { useDate } from '@/utils/date'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import {
   getSignedOssUrl,
   uploadToOssWithKey,
@@ -629,7 +621,6 @@ import {
   validateFileType,
 } from '@/utils/oss'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
@@ -667,10 +658,6 @@ const paginatedData = computed(() => {
 })
 
 // 移除前端分页监听，现在分页在后端进行
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 const buildCoverPreviewUrl = async (
   coverKey?: string | null,
@@ -1253,35 +1240,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.activity-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.activity-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .search-input {
   width: 220px !important;
   min-width: 160px;

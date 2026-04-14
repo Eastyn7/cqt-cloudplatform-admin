@@ -1,136 +1,127 @@
 <template>
-  <div class="team-term-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">届次管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
-      <el-card class="table-card">
-        <template #header>
-          <div class="card-header">
-            <div class="header-left">
-              <span class="card-title">届次列表</span>
-              <el-form
-                :model="searchForm"
-                inline
-                label-width="0"
-                @submit.prevent
-                class="search-form"
-              >
-                <el-form-item>
-                  <el-input
-                    v-model="searchForm.keyword"
-                    placeholder="届次名称"
-                    clearable
-                    @keyup.enter="handleSearch"
-                    class="search-input"
-                  >
-                    <template #prefix>
-                      <el-icon class="el-input__icon">
-                        <Search />
-                      </el-icon>
-                    </template>
-                  </el-input>
-                </el-form-item>
-
-                <el-form-item>
-                  <el-button type="primary" @click="handleSearch" class="search-btn">
-                    <el-icon>
+  <AdminPageLayout title="届次管理">
+    <el-card class="table-card">
+      <template #header>
+        <div class="card-header">
+          <div class="header-left">
+            <span class="card-title">届次列表</span>
+            <el-form
+              :model="searchForm"
+              inline
+              label-width="0"
+              @submit.prevent
+              class="search-form"
+            >
+              <el-form-item>
+                <el-input
+                  v-model="searchForm.keyword"
+                  placeholder="届次名称"
+                  clearable
+                  @keyup.enter="handleSearch"
+                  class="search-input"
+                >
+                  <template #prefix>
+                    <el-icon class="el-input__icon">
                       <Search />
                     </el-icon>
-                    查询
-                  </el-button>
-                </el-form-item>
+                  </template>
+                </el-input>
+              </el-form-item>
 
-                <el-form-item>
-                  <el-button @click="handleResetFilters" class="reset-btn">
-                    <el-icon>
-                      <Refresh />
-                    </el-icon>
-                    重置
-                  </el-button>
-                </el-form-item>
-              </el-form>
-            </div>
-            <div class="header-right">
-              <el-button v-if="isSuperAdmin" type="primary" @click="openAddDialog"
-                >新增届次</el-button
-              >
-            </div>
+              <el-form-item>
+                <el-button type="primary" @click="handleSearch" class="search-btn">
+                  <el-icon>
+                    <Search />
+                  </el-icon>
+                  查询
+                </el-button>
+              </el-form-item>
+
+              <el-form-item>
+                <el-button @click="handleResetFilters" class="reset-btn">
+                  <el-icon>
+                    <Refresh />
+                  </el-icon>
+                  重置
+                </el-button>
+              </el-form-item>
+            </el-form>
           </div>
-        </template>
-
-        <div class="table-wrapper">
-          <el-table
-            :data="paginatedData"
-            v-loading="loading"
-            border
-            stripe
-            table-layout="auto"
-            height="100%"
-          >
-            <el-table-column label="序号" width="60" align="center">
-              <template #default="{ $index }">
-                {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="term_name" label="届次名称" min-width="150" />
-            <el-table-column prop="start_date" label="开始日期" width="120">
-              <template #default="{ row }">
-                <span>{{ dateUtil.formatDate(row.start_date) || '' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="end_date" label="结束日期" width="120">
-              <template #default="{ row }">
-                <span>{{ dateUtil.formatDate(row.end_date) || '' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="is_current" label="当前届" width="100" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.is_current ? 'success' : 'info'">
-                  {{ row.is_current ? '是' : '否' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="200" align="center" fixed="right">
-              <template #default="{ row }">
-                <el-button
-                  v-if="isSuperAdmin"
-                  type="primary"
-                  link
-                  size="small"
-                  @click="openDetail(row)"
-                >
-                  查看详情
-                </el-button>
-                <el-button
-                  v-if="isSuperAdmin"
-                  type="danger"
-                  link
-                  size="small"
-                  @click="handleDelete(row)"
-                >
-                  删除
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+          <div class="header-right">
+            <el-button v-if="isSuperAdmin" type="primary" @click="openAddDialog">新增届次</el-button>
+          </div>
         </div>
+      </template>
 
-        <div class="pagination-container">
-          <el-pagination
-            v-model:current-page="pagination.page"
-            v-model:page-size="pagination.pageSize"
-            :total="pagination.total"
-            :page-sizes="[10, 20, 50, 100]"
-            layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handlePageChange"
-          />
-        </div>
-      </el-card>
+      <div class="table-wrapper">
+        <el-table
+          :data="paginatedData"
+          v-loading="loading"
+          border
+          stripe
+          table-layout="auto"
+          height="100%"
+        >
+          <el-table-column label="序号" width="60" align="center">
+            <template #default="{ $index }">
+              {{ $index + 1 + (pagination.page - 1) * pagination.pageSize }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="term_name" label="届次名称" min-width="150" />
+          <el-table-column prop="start_date" label="开始日期" width="120">
+            <template #default="{ row }">
+              <span>{{ dateUtil.formatDate(row.start_date) || '' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="end_date" label="结束日期" width="120">
+            <template #default="{ row }">
+              <span>{{ dateUtil.formatDate(row.end_date) || '' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="is_current" label="当前届" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.is_current ? 'success' : 'info'">
+                {{ row.is_current ? '是' : '否' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                v-if="isSuperAdmin"
+                type="primary"
+                link
+                size="small"
+                @click="openDetail(row)"
+              >
+                查看详情
+              </el-button>
+              <el-button
+                v-if="isSuperAdmin"
+                type="danger"
+                link
+                size="small"
+                @click="handleDelete(row)"
+              >
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div class="pagination-container">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :page-sizes="[10, 20, 50, 100]"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+    </el-card>
 
       <!-- 详情 Drawer -->
       <el-drawer
@@ -281,8 +272,7 @@
         :json-placeholder="jsonPlaceholder"
         @import="handleImportRows"
       />
-    </div>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -298,8 +288,8 @@ import type {
 import { useDate } from '@/utils/date'
 import BulkImportDialog from '@/components/common/BulkImportDialog.vue'
 import { normalizeImportValue, applyImportedEntries } from '@/utils/importHelpers'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
@@ -331,11 +321,6 @@ const paginatedData = computed(() => {
 })
 
 // 移除前端分页监听，现在分页在后端进行
-
-// 返回上一页或仪表盘
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 // 批量新增相关
 type BatchEntry = {
@@ -702,28 +687,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.team-term-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;

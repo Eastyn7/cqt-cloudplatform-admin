@@ -1,12 +1,5 @@
 <template>
-  <div class="portrait-dimension-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">画像维度管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
+  <AdminPageLayout title="画像维度管理">
       <el-card class="table-card">
         <template #header>
           <div class="card-header">
@@ -111,7 +104,6 @@
           />
         </div>
       </el-card>
-    </div>
 
     <el-dialog v-model="dialogVisible" :title="dialogTitle" width="580px" destroy-on-close>
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
@@ -145,23 +137,17 @@
         <el-button type="primary" :loading="saving" @click="submitForm">保存</el-button>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import { portraitDimensionsApi } from '@/utils/api'
 import type { PortraitDimensionInfo, PortraitDimensionPageParams } from '@/utils/api/types'
-
-const router = useRouter()
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
-}
 
 const loading = ref(false)
 const saving = ref(false)
@@ -302,28 +288,6 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.portrait-dimension-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;

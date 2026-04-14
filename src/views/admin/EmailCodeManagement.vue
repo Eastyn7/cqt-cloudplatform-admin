@@ -1,12 +1,5 @@
 <template>
-  <div class="email-code-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">邮箱验证码管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
+  <AdminPageLayout title="邮箱验证码管理">
       <el-card class="table-card">
         <template #header>
           <div class="card-header">
@@ -147,7 +140,6 @@
           />
         </div>
       </el-card>
-    </div>
 
     <!-- 清理验证码对话框 -->
     <el-dialog
@@ -191,19 +183,18 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { Search, Refresh, Delete } from '@element-plus/icons-vue'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import { emailApi } from '@/utils/api'
 import type { EmailCodeInfo, GetEmailCodeListParams } from '@/utils/api/types'
 import { useDate } from '@/utils/date'
 import dayjs from 'dayjs'
 
-const router = useRouter()
 const dateUtil = useDate
 
 const loading = ref(false)
@@ -250,10 +241,6 @@ const getTypeTagType = (
 const isExpired = (expiresAt: string): boolean => {
   if (!expiresAt) return false
   return dayjs(expiresAt).isBefore(dayjs())
-}
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
 }
 
 const handleSearch = () => {
@@ -353,27 +340,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.email-code-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .table-card {
   flex: 1;
   display: flex;

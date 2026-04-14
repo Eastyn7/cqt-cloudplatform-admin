@@ -1,12 +1,5 @@
 <template>
-  <div class="service-certificate-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">证书管理</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
+  <AdminPageLayout title="证书管理">
       <el-card class="table-card">
         <template #header>
           <div class="card-header">
@@ -43,7 +36,7 @@
         </template>
 
         <div class="table-wrapper">
-          <el-table :data="tableData" v-loading="loading" border stripe>
+          <el-table :data="tableData" v-loading="loading" border stripe height="100%">
             <el-table-column prop="cert_no" label="证书编号" min-width="180" />
             <el-table-column prop="student_id" label="学号" width="140" />
             <el-table-column prop="status" label="状态" width="120">
@@ -91,7 +84,6 @@
           />
         </div>
       </el-card>
-    </div>
 
     <el-dialog
       v-model="previewVisible"
@@ -109,18 +101,16 @@
         </div>
       </el-watermark>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import { serviceCertificateApi } from '@/utils/api'
 import type { ServiceCertificateInfo } from '@/utils/api/types'
 import { formatDateShort, formatDateTime } from '@/utils/date'
-
-const router = useRouter()
 
 const loading = ref(false)
 const previewLoading = ref(false)
@@ -148,10 +138,6 @@ const formatStatusLabel = (status?: string) => {
   if (status === 'generated') return '有效'
   if (status === 'revoked') return '无效'
   return status || '-'
-}
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
 }
 
 const loadList = async () => {
@@ -277,31 +263,12 @@ loadList()
 </script>
 
 <style scoped>
-.service-certificate-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding-top: 12px;
-}
-
 .table-card {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin-top: 20px;
 }
 
 .table-card :deep(.el-card__body) {
@@ -329,7 +296,7 @@ loadList()
 }
 
 .card-title {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 16px;
   white-space: nowrap;
 }

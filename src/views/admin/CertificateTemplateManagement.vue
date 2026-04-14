@@ -1,12 +1,5 @@
 <template>
-  <div class="certificate-template-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">证书模板</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
+  <AdminPageLayout title="证书模板">
       <el-card class="table-card">
         <template #header>
           <div class="card-header">
@@ -82,7 +75,7 @@
         </template>
 
         <div class="table-wrapper">
-          <el-table v-loading="loading" :data="tableData" class="template-table">
+          <el-table v-loading="loading" :data="tableData" class="template-table" height="100%">
             <el-table-column type="index" width="60" />
             <el-table-column prop="template_name" label="模板名称" min-width="220" />
             <el-table-column label="模板用途" min-width="140">
@@ -138,7 +131,6 @@
           />
         </div>
       </el-card>
-    </div>
 
     <el-dialog
       v-model="editorVisible"
@@ -244,6 +236,7 @@
               placeholder="显示名称"
               class="custom-field-input"
             />
+            <div class="form-hint field-hint">证书编号（cert_no）和电子公章（seal）可直接添加，后端会按模板坐标自动渲染。</div>
             <div class="field-action-buttons">
               <el-button type="primary" @click="addField" :disabled="!canvasReady">添加字段</el-button>
               <el-button @click="removeSelectedField" :disabled="!selectedObject">删除字段</el-button>
@@ -256,33 +249,59 @@
               <el-input v-model="selectedField.key" disabled />
               <div class="form-hint">key 是后端填充数据的字段标识，例如 name / hours / date。</div>
             </el-form-item>
-            <el-form-item label="显示文本">
+            <el-form-item label="字段类型">
+              <el-tag :type="selectedField.fieldType === 'image' ? 'warning' : 'success'">
+                {{ selectedField.fieldType === 'image' ? '图片字段' : '文本字段' }}
+              </el-tag>
+            </el-form-item>
+            <el-form-item v-if="selectedField.fieldType !== 'image'" label="显示文本">
               <el-input v-model="selectedField.text" @change="applyFieldText" />
               <div class="form-hint">显示文本是画布上的预览内容，保存后仍以 key 匹配数据。</div>
             </el-form-item>
-            <el-form-item label="字体">
+            <el-form-item v-else label="显示文本">
+              <div class="form-readonly">电子公章</div>
+              <div class="form-hint">图片字段仅保存位置、尺寸和透明度，后端会自动叠加实际公章。</div>
+            </el-form-item>
+            <el-form-item v-if="selectedField.fieldType !== 'image'" label="字体">
               <div class="form-readonly">思源黑体</div>
               <div class="form-hint">字体已固定为思源黑体，不可修改。</div>
             </el-form-item>
-            <el-form-item label="字号">
+            <el-form-item v-if="selectedField.fieldType !== 'image'" label="字号">
               <el-input-number v-model="selectedField.fontSize" :min="12" :max="200" @change="applyFieldStyle" />
             </el-form-item>
-            <el-form-item label="对齐">
+            <el-form-item v-if="selectedField.fieldType !== 'image'" label="对齐">
               <el-radio-group v-model="selectedField.align" @change="applyFieldStyle">
                 <el-radio-button value="left">左对齐</el-radio-button>
                 <el-radio-button value="center">居中</el-radio-button>
                 <el-radio-button value="right">右对齐</el-radio-button>
               </el-radio-group>
             </el-form-item>
-            <el-form-item label="字重">
+            <el-form-item v-if="selectedField.fieldType !== 'image'" label="字重">
               <el-radio-group v-model="selectedField.fontWeight" @change="applyFieldStyle">
                 <el-radio-button value="normal">常规</el-radio-button>
                 <el-radio-button value="bold">加粗</el-radio-button>
               </el-radio-group>
             </el-form-item>
-            <el-form-item label="颜色">
+            <el-form-item v-if="selectedField.fieldType !== 'image'" label="颜色">
               <div class="form-readonly">黑色</div>
               <div class="form-hint">颜色已固定为黑色，不可修改。</div>
+            </el-form-item>
+            <el-form-item v-if="selectedField.fieldType === 'image'" label="公章尺寸">
+              <div class="position-inputs">
+                <el-input-number v-model="selectedField.width" :min="40" :max="600" @change="applyFieldStyle" />
+                <el-input-number v-model="selectedField.height" :min="40" :max="600" @change="applyFieldStyle" />
+              </div>
+            </el-form-item>
+            <el-form-item v-if="selectedField.fieldType === 'image'" label="透明度">
+              <el-input-number
+                v-model="selectedField.opacity"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                :precision="2"
+                @change="applyFieldStyle"
+              />
+              <div class="form-hint">公章字段会在后端自动叠加，前端仅负责位置和尺寸配置。</div>
             </el-form-item>
             <el-form-item label="位置">
               <div class="position-inputs">
@@ -300,16 +319,16 @@
         </div>
       </div>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { Plus, Refresh, Search, Picture } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import { fabric } from 'fabric'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import {
   certificateTemplateApi,
 } from '@/utils/api'
@@ -328,6 +347,7 @@ import {
 interface FieldPreset {
   key: string
   label: string
+  fieldType: 'text' | 'image'
 }
 
 interface CanvasSize {
@@ -348,6 +368,7 @@ interface TemplateEditorForm {
 interface SelectedFieldForm {
   key: string
   text: string
+  fieldType: 'text' | 'image'
   fontFamily: string
   fontSize: number
   align: 'left' | 'center' | 'right'
@@ -355,17 +376,30 @@ interface SelectedFieldForm {
   color: string
   x: number
   y: number
+  width: number
+  height: number
+  opacity: number
+  assetKey: string
 }
 
-type FabricTextWithMeta = fabric.Text & {
+type FabricFieldObject = fabric.Object & {
   dataKey?: string
   displayLabel?: string
+  fieldType?: 'text' | 'image'
+  text?: string
+  textAlign?: 'left' | 'center' | 'right'
+  fontFamily?: string
+  fontWeight?: 'normal' | 'bold' | string
+  fontSize?: number
+  fill?: string | fabric.Color
   realLeft?: number
   realTop?: number
   realFontSize?: number
+  realWidth?: number
+  realHeight?: number
+  realOpacity?: number
+  assetKey?: string
 }
-
-const router = useRouter()
 
 const loading = ref(false)
 const saving = ref(false)
@@ -424,12 +458,14 @@ const imageTransform = reactive({
 })
 
 const fieldPresets: FieldPreset[] = [
-  { key: 'name', label: '姓名' },
-  { key: 'hours', label: '时长' },
-  { key: 'date', label: '日期' },
-  { key: 'issuer', label: '颁发单位' },
-  { key: 'term', label: '届次' },
-  { key: 'title', label: '奖项名称' },
+  { key: 'name', label: '姓名', fieldType: 'text' },
+  { key: 'hours', label: '时长', fieldType: 'text' },
+  { key: 'date', label: '日期', fieldType: 'text' },
+  { key: 'issuer', label: '颁发单位', fieldType: 'text' },
+  { key: 'term', label: '届次', fieldType: 'text' },
+  { key: 'title', label: '奖项名称', fieldType: 'text' },
+  { key: 'cert_no', label: '证书编号', fieldType: 'text' },
+  { key: 'seal', label: '电子公章', fieldType: 'image' },
 ]
 
 const fieldPresetKey = ref<string>('name')
@@ -442,10 +478,11 @@ const canvasInstance = ref<fabric.Canvas | null>(null)
 const backgroundImage = ref<fabric.Image | null>(null)
 const canvasReady = ref(false)
 
-const selectedObject = ref<FabricTextWithMeta | null>(null)
+const selectedObject = ref<FabricFieldObject | null>(null)
 const selectedField = reactive<SelectedFieldForm>({
   key: '',
   text: '',
+  fieldType: 'text',
   fontFamily: 'SimSun',
   fontSize: 30,
   align: 'center',
@@ -453,7 +490,26 @@ const selectedField = reactive<SelectedFieldForm>({
   color: '#1f2d3d',
   x: 0,
   y: 0,
+  width: 280,
+  height: 280,
+  opacity: 0.95,
+  assetKey: 'official_seal',
 })
+
+const SEAL_PLACEHOLDER_SVG = `
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+  <defs>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#b91c1c" flood-opacity="0.22" />
+    </filter>
+  </defs>
+  <circle cx="160" cy="160" r="124" fill="none" stroke="#c81e1e" stroke-width="18" filter="url(#shadow)"/>
+  <circle cx="160" cy="160" r="86" fill="rgba(200,30,30,0.08)" stroke="#c81e1e" stroke-width="10"/>
+  <text x="160" y="176" text-anchor="middle" font-size="44" font-family="SimSun, serif" fill="#c81e1e" font-weight="700">公章</text>
+</svg>
+`
+
+const SEAL_PLACEHOLDER_URL = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(SEAL_PLACEHOLDER_SVG)}`
 
 const templateUploading = ref(false)
 const templateProgress = ref(0)
@@ -489,10 +545,6 @@ const handleEditorClosed = () => {
   imageTransform.scale = 1
   imageTransform.offsetX = 0
   imageTransform.offsetY = 0
-}
-
-const handleBack = () => {
-  router.push('/admin/dashboard')
 }
 
 const handleSearch = async () => {
@@ -551,11 +603,11 @@ const initCanvas = () => {
   canvasInstance.value = canvas
 
   canvas.on('selection:created', (event) => {
-    const target = event.selected?.[0] as FabricTextWithMeta
+    const target = event.selected?.[0] as FabricFieldObject
     if (target) setSelectedObject(target)
   })
   canvas.on('selection:updated', (event) => {
-    const target = event.selected?.[0] as FabricTextWithMeta
+    const target = event.selected?.[0] as FabricFieldObject
     if (target) setSelectedObject(target)
   })
   canvas.on('selection:cleared', () => {
@@ -563,19 +615,20 @@ const initCanvas = () => {
     resetSelectedField()
   })
   canvas.on('object:moving', (event) => {
-    const target = event.target as FabricTextWithMeta | undefined
+    const target = event.target as FabricFieldObject | undefined
     if (target) syncRealFromObject(target)
   })
   canvas.on('object:modified', (event) => {
-    const target = event.target as FabricTextWithMeta | undefined
+    const target = event.target as FabricFieldObject | undefined
     if (target) syncRealFromObject(target)
   })
 }
 
-const setSelectedObject = (target: FabricTextWithMeta) => {
+const setSelectedObject = (target: FabricFieldObject) => {
   selectedObject.value = target
   selectedField.key = target.dataKey || ''
   selectedField.text = target.text || ''
+  selectedField.fieldType = target.fieldType || (target.type === 'image' ? 'image' : 'text')
   selectedField.fontFamily = target.fontFamily || 'SimSun'
   selectedField.fontSize = Math.round((target.realFontSize ?? target.fontSize ?? 0) || 0)
   selectedField.align = (target.textAlign as 'left' | 'center' | 'right') || 'center'
@@ -583,11 +636,16 @@ const setSelectedObject = (target: FabricTextWithMeta) => {
   selectedField.color = target.fill ? String(target.fill) : '#1f2d3d'
   selectedField.x = Math.round(target.realLeft ?? 0)
   selectedField.y = Math.round(target.realTop ?? 0)
+  selectedField.width = Math.round(target.realWidth ?? target.getScaledWidth() ?? 0)
+  selectedField.height = Math.round(target.realHeight ?? target.getScaledHeight() ?? 0)
+  selectedField.opacity = Number((target.realOpacity ?? target.opacity ?? 0.95).toFixed(2))
+  selectedField.assetKey = target.assetKey || 'official_seal'
 }
 
 const resetSelectedField = () => {
   selectedField.key = ''
   selectedField.text = ''
+  selectedField.fieldType = 'text'
   selectedField.fontFamily = 'SimSun'
   selectedField.fontSize = 48
   selectedField.align = 'center'
@@ -595,16 +653,26 @@ const resetSelectedField = () => {
   selectedField.color = '#1f2d3d'
   selectedField.x = 0
   selectedField.y = 0
+  selectedField.width = 280
+  selectedField.height = 280
+  selectedField.opacity = 0.95
+  selectedField.assetKey = 'official_seal'
 }
 
-const syncRealFromObject = (target: FabricTextWithMeta) => {
+const syncRealFromObject = (target: FabricFieldObject) => {
   const scale = imageTransform.scale || 1
   target.realLeft = ((target.left ?? 0) - imageTransform.offsetX) / scale
   target.realTop = ((target.top ?? 0) - imageTransform.offsetY) / scale
-  target.realFontSize = (target.realFontSize ?? target.fontSize ?? 0)
+  if (target.type === 'text') {
+    target.realFontSize = (target.realFontSize ?? (target as fabric.Text).fontSize ?? 0)
+  }
   if (selectedObject.value === target) {
     selectedField.x = Math.round(target.realLeft)
     selectedField.y = Math.round(target.realTop)
+    if (target.type === 'image') {
+      selectedField.width = Math.round(target.realWidth ?? target.getScaledWidth() ?? 0)
+      selectedField.height = Math.round(target.realHeight ?? target.getScaledHeight() ?? 0)
+    }
   }
 }
 
@@ -621,12 +689,27 @@ const rescaleObjects = () => {
   if (!canvas) return
   const scale = imageTransform.scale || 1
   canvas.getObjects().forEach((obj) => {
-    const text = obj as FabricTextWithMeta
-    if (text.type === 'text') {
-      const left = imageTransform.offsetX + (text.realLeft ?? 0) * scale
-      const top = imageTransform.offsetY + (text.realTop ?? 0) * scale
-      const fontSize = (text.realFontSize ?? 0) * scale
-      text.set({ left, top, fontSize })
+    const fieldObject = obj as FabricFieldObject
+    if (fieldObject.type === 'text') {
+      const left = imageTransform.offsetX + (fieldObject.realLeft ?? 0) * scale
+      const top = imageTransform.offsetY + (fieldObject.realTop ?? 0) * scale
+      const fontSize = (fieldObject.realFontSize ?? 0) * scale
+      fieldObject.set({ left, top, fontSize })
+    }
+    if (fieldObject.type === 'image') {
+      const left = imageTransform.offsetX + (fieldObject.realLeft ?? 0) * scale
+      const top = imageTransform.offsetY + (fieldObject.realTop ?? 0) * scale
+      const width = (fieldObject.realWidth ?? 0) * scale
+      const height = (fieldObject.realHeight ?? 0) * scale
+      const intrinsicWidth = fieldObject.width || fieldObject.realWidth || 1
+      const intrinsicHeight = fieldObject.height || fieldObject.realHeight || 1
+      fieldObject.set({
+        left,
+        top,
+        scaleX: width / intrinsicWidth,
+        scaleY: height / intrinsicHeight,
+        opacity: fieldObject.realOpacity ?? 0.95,
+      })
     }
   })
 }
@@ -753,7 +836,7 @@ const clearCanvasObjects = () => {
   canvas.renderAll()
 }
 
-const createTextObject = (field: CertificateTemplateField): FabricTextWithMeta => {
+const createTextObject = (field: CertificateTemplateField): FabricFieldObject => {
   const scale = imageTransform.scale || 1
   const offsetX = imageTransform.offsetX
   const offsetY = imageTransform.offsetY
@@ -772,27 +855,78 @@ const createTextObject = (field: CertificateTemplateField): FabricTextWithMeta =
     hasControls: false,
     lockScalingX: true,
     lockScalingY: true,
-  }) as FabricTextWithMeta
+  }) as FabricFieldObject
   text.dataKey = field.key
   text.displayLabel = field.label
+  text.fieldType = 'text'
   text.realLeft = field.x
   text.realTop = field.y
   text.realFontSize = field.fontSize
   return text
 }
 
-const renderFields = (fields: CertificateTemplateField[]) => {
+const createImageObject = async (field: CertificateTemplateField): Promise<FabricFieldObject> => {
+  const scale = imageTransform.scale || 1
+  const offsetX = imageTransform.offsetX
+  const offsetY = imageTransform.offsetY
+  return new Promise((resolve, reject) => {
+    fabric.Image.fromURL(
+      SEAL_PLACEHOLDER_URL,
+      (img) => {
+        if (!img) {
+          reject(new Error('创建图片字段失败'))
+          return
+        }
+
+        const baseWidth = img.width || field.width || 1
+        const baseHeight = img.height || field.height || 1
+        const targetWidth = field.width || baseWidth
+        const targetHeight = field.height || baseHeight
+        const image = img as FabricFieldObject
+        image.set({
+          left: offsetX + field.x * scale,
+          top: offsetY + field.y * scale,
+          originX: 'left',
+          originY: 'top',
+          selectable: true,
+          hasControls: false,
+          lockScalingX: true,
+          lockScalingY: true,
+          opacity: field.opacity ?? 0.95,
+        })
+        image.scaleX = (targetWidth * scale) / baseWidth
+        image.scaleY = (targetHeight * scale) / baseHeight
+        image.dataKey = field.key
+        image.displayLabel = field.label
+        image.fieldType = 'image'
+        image.realLeft = field.x
+        image.realTop = field.y
+        image.realWidth = targetWidth
+        image.realHeight = targetHeight
+        image.realOpacity = field.opacity ?? 0.95
+        image.assetKey = field.assetKey || 'official_seal'
+        resolve(image)
+      },
+      { crossOrigin: 'anonymous' }
+    )
+  })
+}
+
+const renderFields = async (fields: CertificateTemplateField[]) => {
   const canvas = canvasInstance.value
   if (!canvas) return
   clearCanvasObjects()
-  fields.forEach((field) => {
-    const obj = createTextObject(field)
+  for (const rawField of fields) {
+    const field = normalizeField(rawField)
+    const obj = field.fieldType === 'image'
+      ? await createImageObject(field)
+      : createTextObject(field)
     canvas.add(obj)
-  })
+  }
   canvas.renderAll()
 }
 
-const addField = () => {
+const addField = async () => {
   if (!canvasInstance.value) return
   const imageWidth = imageMeta.width || canvasSize.width
   const imageHeight = imageMeta.height || canvasSize.height
@@ -809,6 +943,7 @@ const addField = () => {
   const field: CertificateTemplateField = {
     key,
     label,
+    fieldType: preset?.fieldType || 'text',
     x: Math.round(imageWidth / 2),
     y: Math.round(imageHeight / 2),
     fontSize: 48,
@@ -817,9 +952,13 @@ const addField = () => {
     color: '#1f2d3d',
     fontWeight: 'normal',
     text: label,
+    width: 280,
+    height: 280,
+    opacity: 0.95,
+    assetKey: key === 'seal' ? 'official_seal' : undefined,
   }
 
-  const obj = createTextObject(field)
+  const obj = field.fieldType === 'image' ? await createImageObject(field) : createTextObject(field)
   canvasInstance.value.add(obj)
   canvasInstance.value.setActiveObject(obj)
   canvasInstance.value.bringToFront(obj)
@@ -845,21 +984,38 @@ const applyFieldText = () => {
 
 const applyFieldStyle = () => {
   if (!selectedObject.value) return
-  const scale = imageTransform.scale || 1
-  selectedObject.value.set({
-    fontFamily: selectedField.fontFamily,
-    fontWeight: selectedField.fontWeight,
-    fill: selectedField.color,
-    fontSize: selectedField.fontSize * scale,
-    textAlign: selectedField.align,
-    originX:
-      selectedField.align === 'center'
-        ? 'center'
-        : selectedField.align === 'right'
-          ? 'right'
-          : 'left',
-  })
-  selectedObject.value.realFontSize = selectedField.fontSize
+  if (selectedField.fieldType === 'image') {
+    const scale = imageTransform.scale || 1
+    const baseWidth = selectedObject.value.width || selectedField.width || 1
+    const baseHeight = selectedObject.value.height || selectedField.height || 1
+    selectedObject.value.realWidth = selectedField.width
+    selectedObject.value.realHeight = selectedField.height
+    selectedObject.value.realOpacity = selectedField.opacity
+    selectedObject.value.assetKey = selectedField.assetKey || 'official_seal'
+    selectedObject.value.set({
+      opacity: selectedField.opacity,
+      scaleX: (selectedField.width * scale) / baseWidth,
+      scaleY: (selectedField.height * scale) / baseHeight,
+      left: imageTransform.offsetX + selectedField.x * scale,
+      top: imageTransform.offsetY + selectedField.y * scale,
+    })
+  } else {
+    const scale = imageTransform.scale || 1
+    selectedObject.value.set({
+      fontFamily: selectedField.fontFamily,
+      fontWeight: selectedField.fontWeight,
+      fill: selectedField.color,
+      fontSize: selectedField.fontSize * scale,
+      textAlign: selectedField.align,
+      originX:
+        selectedField.align === 'center'
+          ? 'center'
+          : selectedField.align === 'right'
+            ? 'right'
+            : 'left',
+    })
+    selectedObject.value.realFontSize = selectedField.fontSize
+  }
   canvasInstance.value?.renderAll()
 }
 
@@ -875,11 +1031,20 @@ const applyFieldPosition = () => {
   canvasInstance.value?.renderAll()
 }
 
+const normalizeField = (field: CertificateTemplateField): CertificateTemplateField => ({
+  ...field,
+  fieldType: field.fieldType || (field.key === 'seal' ? 'image' : 'text'),
+  width: field.width || (field.key === 'seal' ? 280 : undefined),
+  height: field.height || (field.key === 'seal' ? 280 : undefined),
+  opacity: field.opacity ?? (field.key === 'seal' ? 0.95 : undefined),
+  assetKey: field.assetKey || (field.key === 'seal' ? 'official_seal' : undefined),
+})
+
 const parseFields = (raw: CertificateTemplateInfo['fields_json']): CertificateTemplateField[] => {
   if (!raw) return []
-  if (Array.isArray(raw)) return raw as CertificateTemplateField[]
+  if (Array.isArray(raw)) return raw.map((field) => normalizeField(field))
   try {
-    return JSON.parse(raw) as CertificateTemplateField[]
+    return (JSON.parse(raw) as CertificateTemplateField[]).map((field) => normalizeField(field))
   } catch (error) {
     console.error('解析字段配置失败:', error)
     return []
@@ -924,7 +1089,7 @@ const openEditor = async (template?: CertificateTemplateInfo) => {
         canvasInstance.value.renderAll()
       }
 
-      renderFields(parseFields(fullTemplate.fields_json))
+      await renderFields(parseFields(fullTemplate.fields_json))
     } catch (error) {
       console.error('获取模板数据失败:', error)
       ElMessage.error('获取模板数据失败，请稍后重试')
@@ -963,20 +1128,40 @@ const collectFields = (): CertificateTemplateField[] => {
   if (!canvas) return []
   return canvas
     .getObjects()
-    .filter((obj) => obj.type === 'text')
-    .map((obj) => {
-      const text = obj as FabricTextWithMeta
+    .filter((obj) => obj.type === 'text' || obj.type === 'image')
+    .map((obj): CertificateTemplateField => {
+      const fieldObject = obj as FabricFieldObject
+      if (fieldObject.type === 'image') {
+        return {
+          key: fieldObject.dataKey || '',
+          label: fieldObject.displayLabel || '',
+          fieldType: 'image' as const,
+          x: Math.round(fieldObject.realLeft ?? 0),
+          y: Math.round(fieldObject.realTop ?? 0),
+          fontSize: 0,
+          align: 'left',
+          fontFamily: 'SimSun',
+          color: '#1f2d3d',
+          fontWeight: 'normal',
+          text: fieldObject.displayLabel || '',
+          width: Math.round(fieldObject.realWidth ?? fieldObject.getScaledWidth() ?? 0),
+          height: Math.round(fieldObject.realHeight ?? fieldObject.getScaledHeight() ?? 0),
+          opacity: Number((fieldObject.realOpacity ?? fieldObject.opacity ?? 1).toFixed(2)),
+          assetKey: fieldObject.assetKey || 'official_seal',
+        }
+      }
       return {
-        key: text.dataKey || '',
-        label: text.displayLabel || text.text || '',
-        x: Math.round(text.realLeft ?? 0),
-        y: Math.round(text.realTop ?? 0),
-        fontSize: Math.round(text.realFontSize ?? 0),
-        align: (text.textAlign as 'left' | 'center' | 'right') || 'center',
-        fontFamily: text.fontFamily || 'SimSun',
-        color: text.fill ? String(text.fill) : '#1f2d3d',
-        fontWeight: (text.fontWeight as 'normal' | 'bold') || 'normal',
-        text: text.text || '',
+        key: fieldObject.dataKey || '',
+        label: fieldObject.displayLabel || fieldObject.text || '',
+        fieldType: 'text' as const,
+        x: Math.round(fieldObject.realLeft ?? 0),
+        y: Math.round(fieldObject.realTop ?? 0),
+        fontSize: Math.round(fieldObject.realFontSize ?? 0),
+        align: (fieldObject.textAlign as 'left' | 'center' | 'right') || 'center',
+        fontFamily: fieldObject.fontFamily || 'SimSun',
+        color: fieldObject.fill ? String(fieldObject.fill) : '#1f2d3d',
+        fontWeight: (fieldObject.fontWeight as 'normal' | 'bold') || 'normal',
+        text: fieldObject.text || '',
       }
     })
     .filter((field) => field.key)
@@ -1085,29 +1270,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.certificate-template-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-  padding-top: 12px;
-}
-
 .search-input {
   width: 220px !important;
   min-width: 160px;
@@ -1130,6 +1292,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  margin-top: 20px;
 }
 
 .table-card :deep(.el-card__body) {
@@ -1157,7 +1320,7 @@ onBeforeUnmount(() => {
 }
 
 .card-title {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 16px;
   white-space: nowrap;
 }
@@ -1368,7 +1531,8 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   min-height: 0;
 }
 
@@ -1403,11 +1567,10 @@ onBeforeUnmount(() => {
 }
 
 .field-scroll {
-  flex: 1;
-  min-height: 120px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding-right: 4px;
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .field-form {

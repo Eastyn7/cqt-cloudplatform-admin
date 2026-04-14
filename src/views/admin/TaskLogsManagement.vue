@@ -1,12 +1,5 @@
 <template>
-  <div class="task-logs-management">
-    <el-page-header @back="handleBack">
-      <template #content>
-        <span class="page-title">定时任务执行日志</span>
-      </template>
-    </el-page-header>
-
-    <div class="content">
+  <AdminPageLayout title="定时任务执行日志" backPath="/admin/task-config">
       <!-- 执行日志卡片（含统计和表格） -->
       <el-card class="table-card">
         <!-- 统计信息部分 -->
@@ -180,7 +173,6 @@
           />
         </div>
       </el-card>
-    </div>
 
     <!-- 日志详情对话框 -->
     <el-dialog
@@ -234,7 +226,7 @@
         </span>
       </template>
     </el-dialog>
-  </div>
+  </AdminPageLayout>
 </template>
 
 <script setup lang="ts">
@@ -242,6 +234,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
 import { taskApi } from '@/utils/api'
 import type { TaskLogInfo } from '@/utils/api/types'
 import { formatDateTime } from '@/utils/date'
@@ -280,10 +273,6 @@ const successRate = computed(() => {
   if (currentPageTotal === 0) return 0
   return (successCount.value / currentPageTotal) * 100
 })
-
-const handleBack = () => {
-  router.back()
-}
 
 const handleViewConfig = () => {
   router.push('/admin/task-config')
@@ -354,27 +343,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.task-logs-management {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.page-title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-  overflow: hidden;
-  gap: 10px;
-}
-
 .stats-section {
   padding: 0px 16px 0 16px;
   border-bottom: 1px solid #ebeef5;

@@ -34,7 +34,7 @@
               <div class="activity-list-title">当前进行中的活动</div>
               <div class="activity-list-note">
                 <el-tag type="warning" effect="dark" size="small">推荐</el-tag>
-                <span>带“推荐”标签的活动即为推荐活动，已自动置顶</span>
+                <span>带“推荐活动”角标的活动会优先展示</span>
                 <span v-if="recommendedInCurrentCount > 0">（当前页 {{ recommendedInCurrentCount }} 条）</span>
               </div>
             </div>
@@ -62,8 +62,7 @@
                   />
                   <div v-else class="activity-cover-empty">暂无封面</div>
                   <div class="cover-tags">
-                    <el-tag v-if="isRecommended(item.activity_id)" type="warning" effect="dark" size="small">推荐</el-tag>
-                    <el-tag v-if="isJoined(item.activity_id)" type="success" size="small">已报名</el-tag>
+                    <el-tag v-if="isPinned(item)" type="danger" effect="dark" size="small">置顶</el-tag>
                   </div>
                 </div>
 
@@ -72,10 +71,7 @@
                     <el-button link type="primary" class="activity-name-btn" @click="showActivityDetail(item)">
                       {{ item.activity_name }}
                     </el-button>
-                    <div class="activity-title-tags">
-                      <el-tag v-if="isRecommended(item.activity_id)" type="warning" effect="dark" size="small">推荐</el-tag>
-                      <el-tag :type="statusTagType[item.status] || 'info'" size="small">{{ item.status || '-' }}</el-tag>
-                    </div>
+                    <el-tag :type="statusTagType[item.status] || 'info'" size="small">{{ item.status || '-' }}</el-tag>
                   </div>
 
                   <div class="activity-meta-row">
@@ -272,6 +268,15 @@ const dateUtil = useDate
 const RECOMMEND_CACHE_MS = 60 * 1000
 let lastRecommendFetchedAt = 0
 
+type ActivityRecommendationMeta = {
+  is_pinned?: boolean
+  is_priority_category?: boolean
+  matched_keywords?: string[]
+  recommendation_score?: number
+  recommendation_reasons?: string[]
+  strategy_name?: string | null
+}
+
 const formatDateTime = (value?: string | null) => (value ? dateUtil.formatTime(value) : '--')
 
 const isSignupClosed = (activity: ActivityInfo | RecommendationItem | null): boolean => {
@@ -282,8 +287,49 @@ const isSignupClosed = (activity: ActivityInfo | RecommendationItem | null): boo
   return now.isAfter(deadline)
 }
 
+const recommendationDetailMap = computed(() => {
+  return new Map(recommendations.value.map((item) => [item.activity_id, item]))
+})
+
+const getActivityRecommendationMeta = (activity: ActivityInfo | RecommendationItem | null): ActivityRecommendationMeta | null => {
+  if (!activity) return null
+  if ('recommendation_meta' in activity && activity.recommendation_meta) {
+    return activity.recommendation_meta as ActivityRecommendationMeta
+  }
+  if ('recommendation_rank' in activity && activity.recommendation_rank != null) {
+    return {
+      recommendation_score: Number(activity.recommendation_rank),
+    }
+  }
+  const matched = recommendationDetailMap.value.get(activity.activity_id)
+  if (!matched) return null
+  const reasons = normalizeReasons(matched.reasons)
+  return {
+    recommendation_score: Number(matched.score || 0),
+    recommendation_reasons: reasons,
+    is_pinned: reasons.some((reason) => /置顶/.test(reason)),
+  }
+}
+
+const getRecommendationScore = (activity: ActivityInfo | RecommendationItem | null): number => {
+  return Number(getActivityRecommendationMeta(activity)?.recommendation_score ?? 0)
+}
+
+const isPinned = (activity: ActivityInfo | RecommendationItem | null): boolean => {
+  return Boolean(getActivityRecommendationMeta(activity)?.is_pinned)
+}
+
 const recommendedActivityIdSet = computed(
-  () => new Set(recommendations.value.map((item) => item.activity_id))
+  () =>
+    new Set([
+      ...recommendations.value.map((item) => item.activity_id),
+      ...activities.value
+        .filter((item) => {
+          const meta = getActivityRecommendationMeta(item)
+          return Boolean(meta?.is_pinned || meta?.is_priority_category || Number(meta?.recommendation_score ?? 0) > 0)
+        })
+        .map((item) => item.activity_id),
+    ])
 )
 
 const recommendationScoreMap = computed(() => {
@@ -326,6 +372,28 @@ const displayActivities = computed(() => {
   const idSet = recommendedActivityIdSet.value
   const scoreMap = recommendationScoreMap.value
   list.sort((left, right) => {
+    const leftRank = 'recommendation_rank' in left && left.recommendation_rank != null ? left.recommendation_rank : Number.POSITIVE_INFINITY
+    const rightRank = 'recommendation_rank' in right && right.recommendation_rank != null ? right.recommendation_rank : Number.POSITIVE_INFINITY
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank
+    }
+    const leftMeta = getActivityRecommendationMeta(left)
+    const rightMeta = getActivityRecommendationMeta(right)
+    const leftPinned = leftMeta?.is_pinned ? 1 : 0
+    const rightPinned = rightMeta?.is_pinned ? 1 : 0
+    if (leftPinned !== rightPinned) {
+      return rightPinned - leftPinned
+    }
+    const leftPriorityCategory = leftMeta?.is_priority_category ? 1 : 0
+    const rightPriorityCategory = rightMeta?.is_priority_category ? 1 : 0
+    if (leftPriorityCategory !== rightPriorityCategory) {
+      return rightPriorityCategory - leftPriorityCategory
+    }
+    const leftScore = getRecommendationScore(left) || scoreMap.get(left.activity_id) || 0
+    const rightScore = getRecommendationScore(right) || scoreMap.get(right.activity_id) || 0
+    if (leftScore !== rightScore) {
+      return rightScore - leftScore
+    }
     const leftTime = resolveActivityTimePriority(left)
     const rightTime = resolveActivityTimePriority(right)
     if (leftTime !== rightTime) {
@@ -336,9 +404,7 @@ const displayActivities = computed(() => {
     if (rightPriority !== leftPriority) {
       return rightPriority - leftPriority
     }
-    const leftScore = scoreMap.get(left.activity_id) || 0
-    const rightScore = scoreMap.get(right.activity_id) || 0
-    return rightScore - leftScore
+    return left.activity_id - right.activity_id
   })
   return showRecommendOnlyEffect.value
     ? list.filter((item) => idSet.has(item.activity_id))
@@ -422,7 +488,7 @@ const loadActivities = async () => {
   }
 }
 
-const normalizeReasons = (reasons: unknown): string[] => {
+function normalizeReasons(reasons: unknown): string[] {
   if (Array.isArray(reasons)) {
     return reasons.filter((item): item is string => typeof item === 'string' && item.length > 0)
   }
@@ -553,8 +619,7 @@ const handleJoin = async (row: ActivityInfo) => {
       student_id: studentId,
     })
     message.success('报名成功')
-    loadMyRecords()
-    refreshRecommendationsThenLoad()
+    await Promise.all([loadMyRecords(), refreshRecommendationsThenLoad(), loadActivities()])
   } catch (error) {
     if (error !== 'cancel') {
       console.error('报名失败:', error)
@@ -568,8 +633,7 @@ const handleCancel = async (record: StudentActivityRecord) => {
   try {
     await activityParticipantApi.cancel(record.activity_id, studentId)
     message.success('已取消报名')
-    loadMyRecords()
-    refreshRecommendationsThenLoad()
+    await Promise.all([loadMyRecords(), refreshRecommendationsThenLoad(), loadActivities()])
   } catch (error) {
     console.error('取消报名失败:', error)
   }
@@ -818,12 +882,6 @@ onMounted(() => {
   gap: 8px;
 }
 
-.activity-title-tags {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .activity-name-btn {
   font-weight: 600;
   max-width: calc(100% - 80px);
@@ -972,6 +1030,15 @@ onMounted(() => {
 @media (max-width: 768px) {
   .activity-grid {
     grid-template-columns: 1fr;
+  }
+
+  .activity-name-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .activity-name-btn {
+    max-width: 100%;
   }
 }
 

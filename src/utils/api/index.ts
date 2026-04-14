@@ -54,6 +54,7 @@ import type {
   BatchCreateTeamTermResponse,
   CreateBackboneMemberParams,
   CreateBackboneMemberResponse,
+  BackboneMemberPageParams,
   BackboneMemberPageResponse,
   BackboneMemberListResponse,
   BackboneMemberTreeResponse,
@@ -168,6 +169,8 @@ import type {
   RefreshRecommendationsParams,
   RecommendationPageParams,
   RecommendationPageResponse,
+  RecommendationStrategyResponse,
+  UpdateRecommendationStrategyParams,
   PortraitDimensionInfo,
   CreatePortraitDimensionParams,
   UpdatePortraitDimensionParams,
@@ -533,7 +536,7 @@ export const backboneMemberApi = {
    * 获取骨干成员分页列表
    * 公开接口，获取骨干成员分页列表（关联部门、届次）
    */
-  getPage: (params?: { page?: number; pageSize?: number; search?: string }) =>
+  getPage: (params?: BackboneMemberPageParams) =>
     request.get<BackboneMemberPageResponse>('/public/backbone-members/page', {
       params,
       skipAuth: true, // 公共接口，不需要鉴权
@@ -556,6 +559,65 @@ export const backboneMemberApi = {
     request.get<BackboneMemberTreeResponse>('/public/backbone-members/tree', {
       skipAuth: true, // 公共接口，不需要鉴权
     }),
+
+  /**
+   * 导出骨干成员 Excel（后端生成并返回文件流）
+   * admin / superadmin 可使用
+   */
+  exportExcel: async (params: BackboneMemberPageParams) => {
+    if (!params.term_id) {
+      throw new Error('请先选择届次后再导出')
+    }
+
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+    const endpoint = baseUrl.endsWith('/')
+      ? `${baseUrl}backbone-members/export`
+      : `${baseUrl}/backbone-members/export`
+
+    const query = new URLSearchParams({
+      term_id: String(params.term_id),
+    })
+
+    if (params.dept_id) {
+      query.set('dept_id', String(params.dept_id))
+    }
+    if (params.position) {
+      query.set('position', params.position)
+    }
+    if (params.search?.trim()) {
+      query.set('search', params.search.trim())
+    }
+
+    const token = localStorage.getItem('token')
+    const response = await fetch(`${endpoint}?${query.toString()}`, {
+      method: 'GET',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+
+    if (!response.ok) {
+      let errorMessage = `导出失败（${response.status}）`
+      try {
+        const errorJson = (await response.json()) as { message?: string }
+        if (errorJson?.message) {
+          errorMessage = errorJson.message
+        }
+      } catch {
+        // ignore response parse errors
+      }
+      throw new Error(errorMessage)
+    }
+
+    const blob = await response.blob()
+    const disposition = response.headers.get('content-disposition')
+    const parsedFilename = parseFilenameFromDisposition(disposition)
+
+    return {
+      blob,
+      filename: parsedFilename || '骨干成员导出.xlsx',
+    }
+  },
 
   /**
    * 更新骨干成员信息（管理员）
@@ -587,6 +649,23 @@ export const backboneMemberApi = {
     request.post<BatchCreateBackboneMemberResponse>('/backbone-members/batch-create', members, {
       showSuccess: true,
     }),
+}
+
+const parseFilenameFromDisposition = (disposition: string | null) => {
+  if (!disposition) return ''
+
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1]).replace(/["']/g, '')
+    } catch {
+      return utf8Match[1].replace(/["']/g, '')
+    }
+  }
+
+  const normalMatch = disposition.match(/filename=([^;]+)/i)
+  if (!normalMatch?.[1]) return ''
+  return normalMatch[1].trim().replace(/["']/g, '')
 }
 
 // ==================== 志愿活动记录管理相关 API ====================
@@ -1533,6 +1612,22 @@ export const portraitApi = {
 }
 
 export const recommendationsApi = {
+  /**
+   * 获取推荐策略
+   */
+  getStrategy: () =>
+    request.get<RecommendationStrategyResponse>('/recommendations/strategy', {
+      showError: false,
+    }),
+
+  /**
+   * 更新推荐策略
+   */
+  updateStrategy: (data: UpdateRecommendationStrategyParams) =>
+    request.put<{ message: string }>('/recommendations/strategy', data, {
+      showSuccess: true,
+    }),
+
   /**
    * 获取当前登录用户推荐活动
    */

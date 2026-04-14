@@ -581,6 +581,18 @@ export interface BackboneMemberInfo {
 }
 
 /**
+ * 骨干成员分页查询参数
+ */
+export interface BackboneMemberPageParams {
+  page?: number
+  pageSize?: number
+  search?: string
+  term_id?: number
+  dept_id?: number
+  position?: '队长' | '部长' | '副部长' | '部员'
+}
+
+/**
  * 骨干成员分页响应数据
  */
 export type BackboneMemberPageResponse = PaginationResponse<BackboneMemberInfo>
@@ -773,6 +785,9 @@ export interface ActivityInfo {
   end_time?: string | null
   description?: string | null
   status: string
+  recommendation_strategy?: RecommendationStrategyInfo | null
+  recommendation_rank?: number | null
+  recommendation_meta?: RecommendationMetaInfo | null
   created_by?: string | null
   created_at?: string
 }
@@ -1946,11 +1961,13 @@ export interface TaskLogListResponse {
 
 export type CertificateTemplateFieldAlign = 'left' | 'center' | 'right'
 export type CertificateTemplateFieldWeight = 'normal' | 'bold'
+export type CertificateTemplateFieldType = 'text' | 'image'
 export type CertificateTemplateUsage = 'service_hours' | string
 
 export interface CertificateTemplateField {
   key: string
   label: string
+  fieldType?: CertificateTemplateFieldType
   x: number
   y: number
   fontSize: number
@@ -1959,6 +1976,10 @@ export interface CertificateTemplateField {
   color: string
   fontWeight: CertificateTemplateFieldWeight
   text?: string
+  width?: number
+  height?: number
+  opacity?: number
+  assetKey?: string
 }
 
 export interface CertificateTemplateInfo {
@@ -2171,6 +2192,15 @@ export interface RecommendationItem {
   reasons: string[]
 }
 
+export interface RecommendationMetaInfo {
+  is_pinned?: boolean
+  is_priority_category?: boolean
+  matched_keywords?: string[]
+  recommendation_score?: number
+  recommendation_reasons?: string[]
+  strategy_name?: string | null
+}
+
 export interface MyRecommendationsResponse {
   profile: RecommendationProfile
   list: RecommendationItem[]
@@ -2202,6 +2232,37 @@ export interface RecommendationPageParams {
 }
 
 export type RecommendationPageResponse = PaginationResponse<RecommendationRecord>
+
+export interface RecommendationStrategyInfo {
+  strategy_key?: string
+  strategy_name: string
+  enabled: boolean
+  priority_categories: string[]
+  category_boost: number
+  pinned_activity_ids: number[]
+  pinned_boost: number
+  priority_keywords: string[]
+  keyword_boost: number
+  time_boost: number
+  remarks?: string | null
+}
+
+export interface RecommendationStrategyResponse {
+  strategy: RecommendationStrategyInfo | null
+}
+
+export interface UpdateRecommendationStrategyParams {
+  strategy_name: string
+  enabled: boolean
+  priority_categories: string[]
+  category_boost: number
+  pinned_activity_ids: number[]
+  pinned_boost: number
+  priority_keywords: string[]
+  keyword_boost: number
+  time_boost: number
+  remarks?: string | null
+}
 
 export interface PortraitDimensionInfo {
   dimension_id: number
