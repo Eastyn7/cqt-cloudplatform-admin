@@ -154,25 +154,27 @@
                   <el-input v-model="passwordForm.newPassword" type="password" show-password />
                 </el-form-item>
               </el-col>
-              <el-col :xs="24">
+              <el-col :xs="24" :sm="12">
                 <el-form-item label="确认密码" prop="confirmPassword">
                   <el-input v-model="passwordForm.confirmPassword" type="password" show-password />
                 </el-form-item>
               </el-col>
+              <el-col :xs="24" :sm="12">
+                <el-form-item label="邮箱验证码" prop="code">
+                  <el-input v-model="passwordForm.code" placeholder="6 位验证码" maxlength="6">
+                    <template #append>
+                      <el-button
+                        :disabled="sendCodeDisabled"
+                        :loading="codeLoading"
+                        @click="handleSendCode"
+                      >
+                        {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
+                      </el-button>
+                    </template>
+                  </el-input>
+                </el-form-item>
+              </el-col>
             </el-row>
-            <el-form-item label="邮箱验证码" prop="code">
-              <el-input v-model="passwordForm.code" placeholder="6 位验证码" maxlength="6">
-                <template #append>
-                  <el-button
-                    :disabled="sendCodeDisabled"
-                    :loading="codeLoading"
-                    @click="handleSendCode"
-                  >
-                    {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
-                  </el-button>
-                </template>
-              </el-input>
-            </el-form-item>
             <div class="form-actions">
               <el-button type="primary" :loading="passwordSaving" @click="handlePasswordSubmit">
                 更新密码
@@ -495,14 +497,16 @@ onBeforeUnmount(() => {
 <style scoped>
 .profile-center {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding-bottom: 0;
+  flex-direction: column;  
+  gap: 6px;
+  /* padding-bottom: 0; */
+  padding: 0px;
+  margin: 0px;
 }
 
 .profile-card {
   border-radius: 20px;
-  margin-bottom: 20px;
+  margin-bottom: 2px;
 }
 
 .card-header {
@@ -633,6 +637,6 @@ onBeforeUnmount(() => {
 }
 
 :deep(.profile-form .el-form-item) {
-  margin-bottom: 13px;
+  margin-bottom: 16px;
 }
 </style>
