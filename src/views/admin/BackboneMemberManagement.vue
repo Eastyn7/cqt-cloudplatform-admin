@@ -215,7 +215,7 @@
       >
         <el-form :model="detailForm" label-width="100px" class="detail-form">
           <el-form-item label="学号">
-            <el-input v-model="detailForm.student_id" />
+            <el-input v-model="detailForm.student_id" disabled />
           </el-form-item>
           <el-form-item label="姓名">
             <el-input v-model="detailForm.student_name" disabled />
@@ -231,7 +231,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="届次">
-            <el-select v-model="detailForm.term_id" placeholder="请选择届次" style="width: 100%">
+            <el-select v-model="detailForm.term_id" disabled style="width: 100%">
               <el-option
                 v-for="term in teamTerms"
                 :key="term.term_id"
@@ -241,7 +241,12 @@
             </el-select>
           </el-form-item>
           <el-form-item label="职位">
-            <el-select v-model="detailForm.position" placeholder="请选择职位" style="width: 100%">
+            <el-select v-model="detailForm.position" placeholder="请选择职位" filterable style="width: 100%">
+              <el-option
+                v-if="detailForm.position && !positionOptions.includes(detailForm.position as PositionOption)"
+                :label="detailForm.position"
+                :value="detailForm.position"
+              />
               <el-option label="队长" value="队长" />
               <el-option label="部长" value="部长" />
               <el-option label="副部长" value="副部长" />
@@ -738,10 +743,10 @@ const openDetail = async (row: BackboneMemberInfo) => {
   await loadDepartmentsAndTerms()
   detailForm.member_id = row.member_id
   detailForm.student_id = row.student_id || ''
-  detailForm.student_name = row.student_name || ''
-  detailForm.dept_id = row.dept_id || null
-  detailForm.term_id = row.term_id || null
-  detailForm.position = normalizePositionValue(row.position) || ''
+  detailForm.student_name = row.student_name || (row as { name?: string | null }).name || ''
+  detailForm.dept_id = row.dept_id || getDeptIdByName(row.dept_name) || null
+  detailForm.term_id = row.term_id || getTermIdByName(row.term_name) || null
+  detailForm.position = String(row.position || '').trim() as PositionOption
   detailForm.term_start = row.term_start || ''
   detailForm.term_end = row.term_end || ''
   detailForm.remark = row.remark || ''
@@ -757,9 +762,7 @@ const handleDetailSave = async () => {
   detailSaving.value = true
   try {
     const payload: UpdateBackboneMemberParams = {
-      student_id: detailForm.student_id || undefined,
       dept_id: detailForm.dept_id || undefined,
-      term_id: detailForm.term_id || undefined,
       position: detailForm.position || undefined,
       term_start: detailForm.term_start || undefined,
       term_end: detailForm.term_end || undefined,
@@ -816,6 +819,16 @@ const handleResetFilters = async () => {
 const getTermNameById = (termId: number | null | undefined) => {
   if (!termId) return ''
   return teamTerms.value.find((term) => term.term_id === termId)?.term_name || ''
+}
+
+const getDeptIdByName = (deptName: string | null | undefined) => {
+  if (!deptName) return null
+  return departments.value.find((dept) => dept.dept_name === deptName)?.dept_id || null
+}
+
+const getTermIdByName = (termName: string | null | undefined) => {
+  if (!termName) return null
+  return teamTerms.value.find((term) => term.term_name === termName)?.term_id || null
 }
 
 const triggerBlobDownload = (blob: Blob, filename: string) => {

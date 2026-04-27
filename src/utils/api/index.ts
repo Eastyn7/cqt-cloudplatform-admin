@@ -280,7 +280,7 @@ export const authApi = {
    */
   batchRegister: (users: BatchRegisterUser[]) =>
     request.post<BatchRegisterResponse>('/auth/login/batch-register', users, {
-      showSuccess: true,
+      showSuccess: false,
     }),
 }
 
@@ -346,7 +346,7 @@ export const userInfoApi = {
    */
   batchImport: (users: BatchImportUserInfoParams[]) =>
     request.post<BatchImportUserInfoResponse>('/auth/info/batch-import', users, {
-      showSuccess: true,
+      showSuccess: false,
     }),
 }
 

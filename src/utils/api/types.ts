@@ -673,9 +673,7 @@ export interface BackboneMemberTreeResponse {
  * 更新骨干成员信息请求参数
  */
 export interface UpdateBackboneMemberParams {
-  student_id?: string // 学号（格式校验）
   dept_id?: number // 部门 ID
-  term_id?: number // 届次 ID
   position?: '队长' | '部长' | '副部长' | '部员' // 职位
   photo_key?: string // 照片 OSS 存储 key（变更时自动删除旧文件）
   term_start?: string // 任期开始日期

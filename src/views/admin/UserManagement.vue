@@ -426,6 +426,88 @@
       :json-placeholder="jsonPlaceholder"
       @import="handleImportRows"
     />
+
+    <el-dialog
+      v-model="batchResultVisible"
+      title="批量处理结果"
+      class="batch-result-dialog admin-modal-large"
+      :close-on-click-modal="false"
+      @closed="handleBatchResultClosed"
+    >
+      <div class="batch-result-scroll">
+        <el-alert :title="batchResultSummaryText" type="info" show-icon :closable="false" />
+
+        <div v-if="batchRegisterResult" class="result-section">
+          <div class="result-section-header">
+            <div class="result-section-title">批量注册结果</div>
+            <div class="result-section-tags">
+              <el-tag type="info">总数 {{ batchRegisterResult.total }}</el-tag>
+              <el-tag type="success">成功 {{ batchRegisterResult.success }}</el-tag>
+              <el-tag type="danger">失败 {{ batchRegisterResult.failed }}</el-tag>
+            </div>
+          </div>
+
+          <el-table
+            v-if="batchRegisterResult.details?.length"
+            :data="batchRegisterResult.details"
+            border
+            size="small"
+            height="240"
+          >
+            <el-table-column prop="student_id" label="学号" min-width="130" />
+            <el-table-column prop="email" label="邮箱" min-width="180" show-overflow-tooltip />
+            <el-table-column label="状态" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getRegisterStatusType(row.status)">{{
+                  getRegisterStatusLabel(row.status)
+                }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="reason" label="原因" min-width="220" show-overflow-tooltip />
+          </el-table>
+          <el-empty v-else description="暂无明细" />
+        </div>
+
+        <div v-if="batchImportResult" class="result-section">
+          <div class="result-section-header">
+            <div class="result-section-title">批量更新结果</div>
+            <div class="result-section-tags">
+              <el-tag type="success">更新 {{ batchImportResult.updated }}</el-tag>
+              <el-tag type="warning">跳过 {{ batchImportResult.skipped }}</el-tag>
+              <el-tag type="danger">失败 {{ batchImportResult.failed }}</el-tag>
+            </div>
+          </div>
+
+          <el-table
+            v-if="batchImportResult.details?.length"
+            :data="batchImportResult.details"
+            border
+            size="small"
+            height="240"
+          >
+            <el-table-column prop="student_id" label="学号" min-width="140" />
+            <el-table-column label="状态" width="110" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getImportStatusType(row.status)">{{
+                  getImportStatusLabel(row.status)
+                }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="reason" label="原因" min-width="260" show-overflow-tooltip />
+          </el-table>
+          <el-empty v-else description="暂无明细" />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <div />
+          <div class="footer-actions">
+            <el-button type="primary" @click="batchResultVisible = false">我知道了</el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -438,6 +520,8 @@ import type {
   UpdateUserInfoParams,
   BatchRegisterUser,
   BatchImportUserInfoParams,
+  BatchRegisterResponse,
+  BatchImportUserInfoResponse,
   PaginationParams,
 } from '@/utils/api/types'
 import {
@@ -756,6 +840,10 @@ const addDialogVisible = ref(false)
 const addDialogLoading = ref(false)
 const onlyUpdateUserInfo = ref(false)
 const importDialogVisible = ref(false)
+const batchResultVisible = ref(false)
+const batchRegisterResult = ref<BatchRegisterResponse | null>(null)
+const batchImportResult = ref<BatchImportUserInfoResponse | null>(null)
+const openBatchResultAfterAddClosed = ref(false)
 const importFieldHints = [
   { key: 'student_id', label: '学号', required: true },
   { key: 'name', label: '姓名', required: true },
@@ -908,6 +996,8 @@ const handleResetPassword = async () => {
 
 // 打开批量新增弹窗
 const openAddDialog = () => {
+  resetBatchResult()
+  openBatchResultAfterAddClosed.value = false
   addDialogVisible.value = true
 }
 
@@ -917,8 +1007,22 @@ const resetBatchForm = () => {
 
 // 关闭批量新增弹窗时重置表单与“仅更新资料”选项
 const handleAddDialogClosed = () => {
+  if (openBatchResultAfterAddClosed.value) {
+    batchResultVisible.value = true
+    openBatchResultAfterAddClosed.value = false
+    return
+  }
+
   resetBatchForm()
   onlyUpdateUserInfo.value = false
+}
+
+const handleBatchResultClosed = async () => {
+  resetBatchForm()
+  onlyUpdateUserInfo.value = false
+  resetBatchResult()
+  openBatchResultAfterAddClosed.value = false
+  await loadData()
 }
 
 const openImportDialog = () => {
@@ -944,6 +1048,40 @@ const handleImportRows = (rows: ImportableEntry[]) => {
     onSuccess: (count) => ElMessage.success(`成功导入 ${count} 条数据`),
   })
 }
+
+const resetBatchResult = () => {
+  batchRegisterResult.value = null
+  batchImportResult.value = null
+}
+
+const getRegisterStatusType = (status: string) => (status === 'success' ? 'success' : 'danger')
+
+const getRegisterStatusLabel = (status: string) => (status === 'success' ? '成功' : '失败')
+
+const getImportStatusType = (status: string) => {
+  if (status === 'updated') return 'success'
+  if (status === 'skipped') return 'warning'
+  return 'danger'
+}
+
+const getImportStatusLabel = (status: string) => {
+  if (status === 'updated') return '更新成功'
+  if (status === 'skipped') return '跳过'
+  return '失败'
+}
+
+const batchResultSummaryText = computed(() => {
+  const issueCount =
+    (batchRegisterResult.value?.failed ?? 0) +
+    (batchImportResult.value?.failed ?? 0) +
+    (batchImportResult.value?.skipped ?? 0)
+
+  if (issueCount > 0) {
+    return '批量处理已完成，但存在失败或跳过项，请查看明细。'
+  }
+
+  return '批量处理已全部完成，请查看明细。'
+})
 
 // 向批量表格中新增一行空记录
 const handleAddBatchRow = () => {
@@ -971,6 +1109,9 @@ const submitBatchAdd = async () => {
     ElMessage.warning(`第 ${invalidIndex + 1} 行信息未填写完整`)
     throw new Error('invalid entries')
   }
+
+  resetBatchResult()
+
   if (!onlyUpdateUserInfo.value) {
     const registerPayload: BatchRegisterUser[] = batchForm.entries.map((entry) => ({
       student_id: entry.student_id.trim(),
@@ -978,7 +1119,8 @@ const submitBatchAdd = async () => {
       password: entry.password,
       name: entry.name.trim(),
     }))
-    await authApi.batchRegister(registerPayload)
+    const registerResponse = await authApi.batchRegister(registerPayload)
+    batchRegisterResult.value = registerResponse.data ?? null
   }
   const infoPayload: BatchImportUserInfoParams[] = batchForm.entries.map((entry) => ({
     student_id: entry.student_id.trim(),
@@ -990,10 +1132,8 @@ const submitBatchAdd = async () => {
     join_date: entry.join_date || undefined,
     skill_tags: entry.skill_tags || undefined,
   }))
-  await userInfoApi.batchImport(infoPayload)
-  ElMessage.success(onlyUpdateUserInfo.value ? '批量更新成功' : '批量新增成功')
-  resetBatchForm()
-  onlyUpdateUserInfo.value = false
+  const importResponse = await userInfoApi.batchImport(infoPayload)
+  batchImportResult.value = importResponse.data ?? null
 }
 
 // 弹窗底部“确认提交”按钮的点击处理
@@ -1001,8 +1141,8 @@ const handleSubmitAdd = async () => {
   addDialogLoading.value = true
   try {
     await submitBatchAdd()
+    openBatchResultAfterAddClosed.value = true
     addDialogVisible.value = false
-    await loadData()
   } catch (error) {
     console.error('新增用户失败:', error)
   } finally {
@@ -1224,6 +1364,56 @@ onMounted(async () => {
   flex-direction: column;
   gap: 12px;
   overflow: hidden;
+}
+
+:global(.batch-result-dialog) {
+  width: min(88vw, 1100px);
+  max-width: 1100px;
+  height: 86vh;
+  max-height: 90vh;
+  margin: 0 auto !important;
+  top: 50% !important;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-result-scroll {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+}
+
+.result-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.result-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.result-section-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.result-section-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .batch-table {
