@@ -354,6 +354,7 @@ export interface CreateDepartmentParams {
   dept_name: string // 部门名称（唯一）
   description?: string // 部门描述
   leader_id?: string // 负责人学号（自动校验格式）
+  manager_id?: string // 负责该部门的队长学号
   display_order?: number // 排序数字，越小越靠前
 }
 
@@ -365,6 +366,7 @@ export interface CreateDepartmentResponse {
   dept_name: string
   description?: string
   leader_id?: string
+  manager_id?: string
   display_order?: number
 }
 
@@ -377,6 +379,8 @@ export interface DepartmentInfo {
   description?: string | null
   leader_id?: string | null
   leader_name?: string | null
+  manager_id?: string | null
+  manager_name?: string | null
   display_order?: number
 }
 
@@ -397,6 +401,7 @@ export interface UpdateDepartmentParams {
   dept_name?: string // 新部门名称
   description?: string // 部门描述
   leader_id?: string // 负责人学号
+  manager_id?: string // 负责该部门的队长学号
   display_order?: number // 排序数字
 }
 
@@ -407,6 +412,7 @@ export interface BatchCreateDepartmentParams {
   dept_name: string // 部门名称（必填）
   description?: string
   leader_id?: string
+  manager_id?: string
   display_order?: number
 }
 
@@ -601,6 +607,28 @@ export type BackboneMemberPageResponse = PaginationResponse<BackboneMemberInfo>
  * 骨干成员列表响应数据
  */
 export type BackboneMemberListResponse = ListResponse<BackboneMemberInfo>
+
+/**
+ * 当前用户骨干身份信息
+ */
+export interface BackboneMemberIdentityInfo {
+  exists: boolean
+  member_id?: number | null
+  student_id?: string | null
+  name?: string | null
+  position?: string | null
+  is_manager?: boolean | null
+  dept_id?: number | null
+  dept_name?: string | null
+  term_id?: number | null
+  term_name?: string | null
+  can_apply_election: boolean
+}
+
+/**
+ * 当前用户骨干身份查询响应数据
+ */
+export type BackboneMemberIdentityResponse = BackboneMemberIdentityInfo
 
 /**
  * 骨干成员树状结构 - 成员项（按届次→队长→部门→成员）
@@ -1538,7 +1566,7 @@ export interface TeamRecruitmentInfo {
  */
 export interface SubmitRecruitmentParams {
   year: number
-  recruitment_type: RecruitmentType
+  type: RecruitmentType
   student_id: string
   name: string
   gender: '男' | '女' | '其他'
@@ -1557,8 +1585,24 @@ export interface SubmitRecruitmentParams {
   self_intro?: string
   past_experience?: string
   reason_for_joining?: string
-  skill_tags?: string
+  skill_tags?: string[]
   avatar_key?: string
+}
+
+/**
+ * 查询当前用户报名详情响应中的记录数据
+ */
+export interface RecruitmentMyApplicationRecord extends Omit<TeamRecruitmentInfo, 'skill_tags'> {
+  type?: RecruitmentType
+  skill_tags?: string[] | string | null
+}
+
+/**
+ * 查询当前用户报名详情响应数据
+ */
+export interface RecruitmentMyApplicationResponse {
+  has_submitted: boolean
+  record: RecruitmentMyApplicationRecord | null
 }
 
 /**
@@ -1649,8 +1693,57 @@ export interface RecruitmentSeasonInfo {
  * 获取当前报名通道响应数据
  */
 export interface CurrentSeasonResponse {
-  season: RecruitmentSeasonInfo | null
+  season: RecruitmentSeasonInfo | RecruitmentSeasonInfo[] | null
 }
+
+/**
+ * 用户身份查询 - 开放通道项
+ */
+export interface RecruitmentUserStatusChannel {
+  type: RecruitmentType
+  title?: string | null
+  year?: number | null
+  eligible: boolean
+}
+
+/**
+ * 用户身份查询 - 资格信息
+ */
+export interface RecruitmentUserStatusEligibility {
+  can_apply_new_student?: boolean
+  can_apply_internal_election?: boolean
+  can_apply_election?: boolean // 兼容后端可能返回的顶级字段
+}
+
+/**
+ * 用户身份查询 - 骨干信息
+ */
+export interface RecruitmentUserStatusBackboneInfo {
+  position?: string | null
+  department?: string | null
+  term?: string | null
+  is_current_term?: boolean | null
+  is_leader?: boolean | null
+}
+
+/**
+ * 用户身份查询响应数据
+ */
+export interface RecruitmentUserStatusData {
+  student_id: string
+  is_backbone_member: boolean
+  backbone_info?: RecruitmentUserStatusBackboneInfo | null
+  open_channels: RecruitmentUserStatusChannel[]
+  eligibility?: RecruitmentUserStatusEligibility | null
+  can_apply_election?: boolean // 兼容后端可能返回的顶级字段
+  message: string
+  exists?: boolean // 兼容已是骨干成员的情况
+}
+
+/**
+ * 用户身份查询响应数据（接口返回的 data 内容）
+ */
+export type RecruitmentUserStatusResponse = RecruitmentUserStatusData
 
 /**
  * 报名通道列表响应数据

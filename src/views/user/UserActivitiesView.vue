@@ -96,12 +96,19 @@
                     <el-button
                       type="primary"
                       size="small"
-                      :disabled="item.status === '已结束' || isSignupClosed(item) || isJoined(item.activity_id)"
+                      :disabled="
+                        item.status === '已结束' ||
+                        isSignupNotStarted(item) ||
+                        isSignupClosed(item) ||
+                        isJoined(item.activity_id)
+                      "
                       @click="handleJoin(item)"
                     >
                       {{
                         item.status === '已结束'
                           ? '已结束'
+                          : isSignupNotStarted(item)
+                            ? '报名未开始'
                           : isSignupClosed(item)
                             ? '报名已截止'
                             : isJoined(item.activity_id)
@@ -219,10 +226,20 @@
           <el-button
             v-if="currentActivity && currentActivityStatus !== '已结束'"
             type="primary"
-            :disabled="isAlreadyJoined || isSignupClosed(currentActivity)"
+            :disabled="
+              isAlreadyJoined || isSignupNotStarted(currentActivity) || isSignupClosed(currentActivity)
+            "
             @click="handleJoinCurrentActivity"
           >
-            {{ isAlreadyJoined ? '已报名' : isSignupClosed(currentActivity) ? '报名已截止' : '立即报名' }}
+            {{
+              isAlreadyJoined
+                ? '已报名'
+                : isSignupNotStarted(currentActivity)
+                  ? '报名未开始'
+                  : isSignupClosed(currentActivity)
+                    ? '报名已截止'
+                    : '立即报名'
+            }}
           </el-button>
         </div>
       </template>
@@ -252,6 +269,7 @@ const currentActivity = ref<ActivityInfo | RecommendationItem | null>(null)
 
 const activities = ref<ActivityInfo[]>([])
 const myRecords = ref<StudentActivityRecord[]>([])
+const joinedActivityIds = ref<Set<number>>(new Set())
 const recommendations = ref<RecommendationItem[]>([])
 const coverUrlMap = ref<Record<string, string>>({})
 
@@ -285,6 +303,14 @@ const isSignupClosed = (activity: ActivityInfo | RecommendationItem | null): boo
   const now = dateUtil.toDayjs(new Date())
   if (!deadline || !now) return false
   return now.isAfter(deadline)
+}
+
+const isSignupNotStarted = (activity: ActivityInfo | RecommendationItem | null): boolean => {
+  if (!activity?.signup_start_time) return false
+  const start = dateUtil.toDayjs(activity.signup_start_time)
+  const now = dateUtil.toDayjs(new Date())
+  if (!start || !now) return false
+  return now.isBefore(start)
 }
 
 const recommendationDetailMap = computed(() => {
@@ -360,8 +386,13 @@ const resolveActivityTimePriority = (activity: ActivityInfo): number => {
 const displayActivityCards = computed(() => {
   const list = [...displayActivities.value]
   list.sort((left, right) => {
-    const leftJoined = myRecords.value.some((record) => record.activity_id === left.activity_id) ? 1 : 0
-    const rightJoined = myRecords.value.some((record) => record.activity_id === right.activity_id) ? 1 : 0
+    const leftPinned = isPinned(left) ? 1 : 0
+    const rightPinned = isPinned(right) ? 1 : 0
+    if (leftPinned !== rightPinned) {
+      return rightPinned - leftPinned
+    }
+    const leftJoined = joinedActivityIds.value.has(left.activity_id) ? 1 : 0
+    const rightJoined = joinedActivityIds.value.has(right.activity_id) ? 1 : 0
     return leftJoined - rightJoined
   })
   return list
@@ -431,9 +462,7 @@ const currentActivityStatus = computed(() => {
 
 const isAlreadyJoined = computed(() => {
   if (!currentActivity.value) return false
-  return myRecords.value.some(
-    (record) => record.activity_id === currentActivity.value?.activity_id
-  )
+  return joinedActivityIds.value.has(currentActivity.value.activity_id)
 })
 
 const loadCategories = async () => {
@@ -569,6 +598,22 @@ const loadMyRecords = async () => {
   }
 }
 
+const loadJoinedActivityIds = async () => {
+  const studentId = localStorage.getItem('student_id') || ''
+  if (!studentId) {
+    joinedActivityIds.value = new Set()
+    return
+  }
+  try {
+    const res = await activityParticipantApi.getStudentRecords(studentId)
+    const ids = new Set((res.data?.list || []).map((record) => record.activity_id))
+    joinedActivityIds.value = ids
+  } catch (error) {
+    console.error('加载已报名活动失败:', error)
+    joinedActivityIds.value = new Set()
+  }
+}
+
 const handleSearch = () => {
   pagination.page = 1
   loadActivities()
@@ -608,6 +653,10 @@ const handleJoin = async (row: ActivityInfo) => {
     message.warning('报名时间已截止，无法报名')
     return
   }
+  if (isSignupNotStarted(row)) {
+    message.warning('报名尚未开始，请稍后再试')
+    return
+  }
   try {
     await ElMessageBox.confirm('确定报名该活动吗？', '确认报名', {
       type: 'warning',
@@ -618,8 +667,7 @@ const handleJoin = async (row: ActivityInfo) => {
       activity_id: row.activity_id,
       student_id: studentId,
     })
-    message.success('报名成功')
-    await Promise.all([loadMyRecords(), refreshRecommendationsThenLoad(), loadActivities()])
+    await Promise.all([loadMyRecords(), loadJoinedActivityIds(), refreshRecommendationsThenLoad(), loadActivities()])
   } catch (error) {
     if (error !== 'cancel') {
       console.error('报名失败:', error)
@@ -632,8 +680,7 @@ const handleCancel = async (record: StudentActivityRecord) => {
   if (!studentId) return
   try {
     await activityParticipantApi.cancel(record.activity_id, studentId)
-    message.success('已取消报名')
-    await Promise.all([loadMyRecords(), refreshRecommendationsThenLoad(), loadActivities()])
+    await Promise.all([loadMyRecords(), loadJoinedActivityIds(), refreshRecommendationsThenLoad(), loadActivities()])
   } catch (error) {
     console.error('取消报名失败:', error)
   }
@@ -665,7 +712,7 @@ const getRecruitmentLimit = (activity: ActivityInfo | RecommendationItem | null)
 }
 
 const isJoined = (activityId: number): boolean => {
-  return myRecords.value.some((record) => record.activity_id === activityId)
+  return joinedActivityIds.value.has(activityId)
 }
 
 const handleJoinCurrentActivity = async () => {
@@ -690,6 +737,7 @@ watch(activeTab, (tab) => {
 
 onMounted(() => {
   loadCategories()
+  loadJoinedActivityIds()
   loadActivities()
   refreshRecommendationsThenLoad()
 })

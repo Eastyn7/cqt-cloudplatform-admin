@@ -15,7 +15,7 @@
                 <el-form-item>
                   <el-input
                     v-model="searchForm.keyword"
-                    placeholder="部门名称 / 负责人学号 / 负责人名称"
+                    placeholder="部门名称 / 负责人学号 / 负责人名称 / 队长学号 / 队长名称"
                     clearable
                     @keyup.enter="handleSearch"
                     class="search-input"
@@ -76,6 +76,8 @@
             />
             <el-table-column prop="leader_id" label="负责人学号" min-width="130" />
             <el-table-column prop="leader_name" label="负责人姓名" min-width="120" />
+            <el-table-column prop="manager_id" label="负责队长学号" min-width="130" />
+            <el-table-column prop="manager_name" label="负责队长姓名" min-width="120" />
             <el-table-column prop="display_order" label="排序号" width="100" align="center" />
             <el-table-column label="操作" width="200" align="center" fixed="right">
               <template #default="{ row }">
@@ -128,6 +130,12 @@
           </el-form-item>
           <el-form-item label="负责人姓名">
             <el-input v-model="detailForm.leader_name" disabled />
+          </el-form-item>
+          <el-form-item label="负责队长学号">
+            <el-input v-model="detailForm.manager_id" placeholder="请输入负责该部门的队长学号" />
+          </el-form-item>
+          <el-form-item label="负责队长姓名">
+            <el-input v-model="detailForm.manager_name" disabled />
           </el-form-item>
           <el-form-item label="排序号">
             <el-input-number
@@ -191,6 +199,11 @@
             <el-table-column label="负责人学号" min-width="130">
               <template #default="{ row }">
                 <el-input v-model="row.leader_id" placeholder="负责人学号" />
+              </template>
+            </el-table-column>
+            <el-table-column label="负责队长学号" min-width="130">
+              <template #default="{ row }">
+                <el-input v-model="row.manager_id" placeholder="负责队长学号" />
               </template>
             </el-table-column>
             <el-table-column label="排序号" min-width="100">
@@ -277,21 +290,23 @@ const importDialogVisible = ref(false)
 const importFieldHints = [
   { key: 'dept_name', label: '部门名称', required: true },
   { key: 'description', label: '部门描述' },
-  { key: 'leader_name', label: '负责人姓名' },
+  { key: 'leader_id', label: '负责人学号' },
+  { key: 'manager_id', label: '负责队长学号' },
   { key: 'display_order', label: '显示顺序（数字）' },
 ]
 const importExample = `[
   {
     "dept_name": "秘书处",
     "description": "负责队伍日常行政事务",
-    "leader_name": "张三",
+    "leader_id": "2024010001",
+    "manager_id": "2024010002",
     "display_order": 1
   }
 ]`
 const jsonPlaceholder = '粘贴 JSON 数组，例如上方示例'
 
 type ImportableEntry = Partial<
-  Record<'dept_name' | 'description' | 'leader_name' | 'display_order', string>
+  Record<'dept_name' | 'description' | 'leader_id' | 'manager_id' | 'display_order', string>
 > &
   Record<string, string | number | boolean | null | undefined>
 
@@ -307,6 +322,7 @@ type BatchEntry = {
   dept_name: string
   description: string
   leader_id: string
+  manager_id: string
   display_order: number
 }
 
@@ -314,6 +330,7 @@ const createBatchEntry = (): BatchEntry => ({
   dept_name: '',
   description: '',
   leader_id: '',
+  manager_id: '',
   display_order: 0,
 })
 
@@ -356,6 +373,8 @@ const detailForm = reactive({
   description: '',
   leader_id: '',
   leader_name: '',
+  manager_id: '',
+  manager_name: '',
   display_order: 0,
   created_at: '',
   updated_at: '',
@@ -367,6 +386,8 @@ const resetDetailForm = () => {
   detailForm.description = ''
   detailForm.leader_id = ''
   detailForm.leader_name = ''
+  detailForm.manager_id = ''
+  detailForm.manager_name = ''
   detailForm.display_order = 0
   detailForm.created_at = ''
   detailForm.updated_at = ''
@@ -380,6 +401,8 @@ const openDetail = async (row: DepartmentInfo) => {
   detailForm.description = row.description || ''
   detailForm.leader_id = row.leader_id || ''
   detailForm.leader_name = row.leader_name || ''
+  detailForm.manager_id = row.manager_id || ''
+  detailForm.manager_name = row.manager_name || ''
   detailForm.display_order = row.display_order || 0
 
   // 尝试获取详细信息（包含创建时间和更新时间）
@@ -394,6 +417,8 @@ const openDetail = async (row: DepartmentInfo) => {
       if (detail.description !== undefined) detailForm.description = detail.description || ''
       if (detail.leader_id !== undefined) detailForm.leader_id = detail.leader_id || ''
       if (detail.leader_name !== undefined) detailForm.leader_name = detail.leader_name || ''
+      if (detail.manager_id !== undefined) detailForm.manager_id = detail.manager_id || ''
+      if (detail.manager_name !== undefined) detailForm.manager_name = detail.manager_name || ''
       if (detail.display_order !== undefined) detailForm.display_order = detail.display_order || 0
     }
   } catch (error) {
@@ -411,10 +436,10 @@ const handleDetailSave = async () => {
       dept_name: detailForm.dept_name || undefined,
       description: detailForm.description || undefined,
       leader_id: detailForm.leader_id || undefined,
+      manager_id: detailForm.manager_id || undefined,
       display_order: detailForm.display_order || undefined,
     }
     await departmentApi.update(detailForm.dept_id, payload)
-    ElMessage.success('部门信息已更新')
     detailVisible.value = false
     resetDetailForm()
     await loadData()
@@ -468,6 +493,7 @@ const handleImportRows = (rows: ImportableEntry[]) => {
         dept_name: normalizeImportValue(item.dept_name) || '',
         description: normalizeImportValue(item.description) || '',
         leader_id: normalizeImportValue(item.leader_id) || '',
+        manager_id: normalizeImportValue(item.manager_id) || '',
         display_order: Number(normalizeImportValue(item.display_order)) || 0,
       }
       return entry
@@ -514,6 +540,7 @@ const submitBatchAdd = async () => {
       dept_name: entry.dept_name.trim(),
       description: entry.description?.trim() || undefined,
       leader_id: entry.leader_id?.trim() || undefined,
+      manager_id: entry.manager_id?.trim() || undefined,
       display_order: entry.display_order || undefined,
     }
     await departmentApi.create(payload)
@@ -526,6 +553,7 @@ const submitBatchAdd = async () => {
     dept_name: entry.dept_name.trim(),
     description: entry.description?.trim() || undefined,
     leader_id: entry.leader_id?.trim() || undefined,
+    manager_id: entry.manager_id?.trim() || undefined,
     display_order: entry.display_order || undefined,
   }))
 

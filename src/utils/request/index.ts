@@ -14,6 +14,35 @@ const service: AxiosInstance = axios.create({
   },
 })
 
+const AUTH_REDIRECT_DELAY = 1500
+let authRedirecting = false
+
+const clearAuthStorage = () => {
+  localStorage.removeItem('token')
+  localStorage.removeItem('role')
+  localStorage.removeItem('student_id')
+  localStorage.removeItem('email')
+}
+
+const handleUnauthorized = (messageText: string, config?: RequestConfig) => {
+  if (authRedirecting) {
+    return
+  }
+
+  authRedirecting = true
+
+  if (config?.showError !== false) {
+    message.warning(messageText || '登录状态已过期，请重新登录')
+  }
+
+  clearAuthStorage()
+
+  setTimeout(() => {
+    window.location.href = '/'
+    authRedirecting = false
+  }, AUTH_REDIRECT_DELAY)
+}
+
 /**
  * 请求拦截器
  */
@@ -87,15 +116,7 @@ service.interceptors.response.use(
         return Promise.reject(new Error(errorMsg))
       }
 
-      if (config?.showError !== false) {
-        message.warning(errorMsg || '登录状态已过期，请重新登录')
-        // 清除 token 和用户信息
-        localStorage.removeItem('token')
-        // 延迟跳转到首页/登录页，让用户看到提示
-        setTimeout(() => {
-          window.location.href = '/'
-        }, 1500)
-      }
+      handleUnauthorized(errorMsg || '登录状态已过期，请重新登录', config)
       return Promise.reject(new Error(errorMsg))
     }
 
@@ -179,13 +200,8 @@ service.interceptors.response.use(
             return Promise.reject(new Error(unauthorizedMsg))
           }
 
-          if (config?.showError !== false) {
-            message.warning(unauthorizedMsg)
-            localStorage.removeItem('token')
-            setTimeout(() => {
-              window.location.href = '/'
-            }, 1500)
-          }
+          handleUnauthorized(unauthorizedMsg, config)
+          return Promise.reject(new Error(unauthorizedMsg))
         } else if (config?.showError !== false) {
           message.error(errorMessage)
         }
@@ -198,8 +214,7 @@ service.interceptors.response.use(
             break
           case 401:
             errorMessage = '未授权，请重新登录'
-            localStorage.removeItem('token')
-            window.location.href = '/login'
+            handleUnauthorized(errorMessage, config)
             break
           case 403:
             errorMessage = '无权限访问'

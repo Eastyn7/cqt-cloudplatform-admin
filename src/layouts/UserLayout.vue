@@ -119,15 +119,28 @@ const isCollapsed = ref(false)
 const teamFlag = TeamFlag
 const teamEmblem = TeamEmblem
 
-const menuItems: MenuItem[] = [
-  { label: '数据驾驶舱', index: '/user/dashboard', icon: DataLine },
-  { label: '个人中心', index: '/user/profile', icon: UserFilled },
-  { label: '人物画像', index: '/user/portrait', icon: TrendCharts },
-  { label: '公告通知', index: '/user/announcements', icon: Document },
-  { label: '活动报名', index: '/user/activities', icon: Calendar },
-  { label: '团队相册', index: '/user/gallery', icon: Picture },
-  { label: '我的证书', index: '/user/certificates', icon: Medal },
-]
+const currentStudentId = computed(() => userStore.profile?.student_id || localStorage.getItem('student_id') || '')
+const currentRole = computed(() => userStore.profile?.role || localStorage.getItem('role') || '')
+
+// 使用新的报名资格判断逻辑（来自 /team-recruitment/user-status）
+const showNewStudentEntry = computed(() => currentRole.value === 'user' && !userStore.isBackboneMember)
+const showElectionEntry = computed(() => currentRole.value === 'user' && userStore.isBackboneMember)
+
+const menuItems = computed(() => {
+  const items: Array<MenuItem | undefined> = [
+    { label: '数据驾驶舱', index: '/user/dashboard', icon: DataLine },
+    showNewStudentEntry.value ? { label: '新生报名', index: '/user/recruitment', icon: Document } : undefined,
+    showElectionEntry.value ? { label: '换届竞选', index: '/user/election', icon: Medal } : undefined,
+    { label: '个人中心', index: '/user/profile', icon: UserFilled },
+    { label: '人物画像', index: '/user/portrait', icon: TrendCharts },
+    { label: '公告通知', index: '/user/announcements', icon: Document },
+    { label: '活动报名', index: '/user/activities', icon: Calendar },
+    { label: '团队相册', index: '/user/gallery', icon: Picture },
+    { label: '我的证书', index: '/user/certificates', icon: Medal },
+  ]
+
+  return items.filter((item): item is MenuItem => Boolean(item))
+})
 
 const activeMenu = computed(() => route.path)
 
@@ -136,7 +149,7 @@ const userAvatar = computed(() => userStore.avatar)
 const userInitial = computed(() => displayName.value.slice(-2))
 
 const roleLabel = computed(() => {
-  const role = localStorage.getItem('role') || ''
+  const role = currentRole.value
   if (role === 'superadmin') return '超级管理员'
   if (role === 'admin') return '管理员'
   return '志愿者'
@@ -166,9 +179,9 @@ const handleLogout = () => {
 }
 
 onMounted(() => {
-  const studentId = localStorage.getItem('student_id') || ''
+  const studentId = currentStudentId.value
   if (studentId) {
-    userStore.fetchProfile(studentId)
+    void userStore.fetchProfile(studentId)
   }
 })
 </script>

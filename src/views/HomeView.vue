@@ -27,58 +27,69 @@
         <div class="home-right">
           <el-card class="login-card" shadow="always">
             <template #header>
-              <div class="login-header">
-                <h3>平台登录</h3>
-                <p class="login-subtitle">请使用您的账号登录志愿服务平台</p>
+              <div class="login-header tabs">
+                <div class="tab-buttons">
+                  <el-button :type="activeTab==='login' ? 'primary' : 'text'" size="default" @click="activeTab='login'">登录</el-button>
+                  <el-button :type="activeTab==='register' ? 'primary' : 'text'" size="default" @click="activeTab='register'">注册</el-button>
+                </div>
+                <p class="login-subtitle">{{ activeTab === 'login' ? '请使用您的账号登录志愿服务平台' : '注册后可直接登录并完善个人资料' }}</p>
               </div>
             </template>
 
-            <el-form
-              ref="loginFormRef"
-              :model="loginForm"
-              :rules="loginRules"
-              class="login-form"
-              @submit.prevent="handleLogin"
-            >
-              <el-form-item prop="loginInput">
-                <el-input
-                  v-model="loginForm.loginInput"
-                  placeholder="请输入学号或邮箱"
-                  size="large"
-                  clearable
-                />
-              </el-form-item>
-
-              <el-form-item prop="password">
-                <el-input
-                  v-model="loginForm.password"
-                  type="password"
-                  placeholder="请输入密码"
-                  size="large"
-                  show-password
-                  clearable
-                  @keyup.enter="handleLogin"
-                />
-              </el-form-item>
-
-              <el-form-item>
-                <el-button
-                  type="primary"
-                  size="large"
-                  class="login-button"
-                  :loading="loginLoading"
-                  @click="handleLogin"
+            <transition name="fade" mode="out-in">
+              <div key="login" v-if="activeTab === 'login'" class="panel-content">
+                <el-form
+                  ref="loginFormRef"
+                  :model="loginForm"
+                  :rules="loginRules"
+                  class="login-form"
+                  @submit.prevent="handleLogin"
                 >
-                  {{ loginLoading ? '登录中...' : '登录' }}
-                </el-button>
-              </el-form-item>
+                  <el-form-item prop="loginInput">
+                    <el-input
+                      v-model="loginForm.loginInput"
+                      placeholder="请输入学号或邮箱"
+                      size="large"
+                      clearable
+                    />
+                  </el-form-item>
 
-              <el-form-item class="forgot-row">
-                <el-button type="primary" link class="forgot-link" @click="openForgotDialog">
-                  忘记密码？
-                </el-button>
-              </el-form-item>
-            </el-form>
+                  <el-form-item prop="password">
+                    <el-input
+                      v-model="loginForm.password"
+                      type="password"
+                      placeholder="请输入密码"
+                      size="large"
+                      show-password
+                      clearable
+                      @keyup.enter="handleLogin"
+                    />
+                  </el-form-item>
+
+                  <el-form-item>
+                    <el-button
+                      type="primary"
+                      size="large"
+                      class="login-button"
+                      :loading="loginLoading"
+                      @click="handleLogin"
+                    >
+                      {{ loginLoading ? '登录中...' : '登录' }}
+                    </el-button>
+                  </el-form-item>
+
+                  <el-form-item class="forgot-row">
+                    <el-button type="primary" link class="forgot-link" @click="openForgotDialog">
+                      忘记密码？
+                    </el-button>
+                  </el-form-item>
+                </el-form>
+              </div>
+
+              <div key="register" v-else class="panel-content">
+                <RegisterForm @registered="handleRegistered" />
+              </div>
+            </transition>
           </el-card>
         </div>
       </div>
@@ -134,7 +145,7 @@
     </el-dialog>
 
     <div class="home-footer">
-      <p>© 2025 常青藤志愿服务平台 - 后台管理系统</p>
+      <p>© 2026 常青藤志愿服务平台 - 后台管理系统</p>
 
       <!-- 工信部ICP备案 -->
       <p class="icp">
@@ -150,6 +161,7 @@ import { authApi, emailApi } from '../utils/api'
 import type { UserRole } from '../utils/api/types'
 import { message } from '../utils/message'
 import TeamEmblem from '../assets/TeamEmblem.png'
+import RegisterForm from '../components/user/RegisterForm.vue'
 
 const router = useRouter()
 
@@ -162,6 +174,15 @@ const loginForm = reactive({
   loginInput: '',
   password: '',
 })
+
+const activeTab = ref<'login'|'register'>('login')
+
+const handleRegistered = () => {
+  // 注册成功后切回登录并清空登录框
+  activeTab.value = 'login'
+  loginForm.loginInput = ''
+  loginForm.password = ''
+}
 
 const loginRules: FormRules = {
   loginInput: [{ required: true, message: '请输入学号或邮箱', trigger: 'blur' }],
@@ -444,6 +465,10 @@ const handleLogin = async () => {
   padding: 10px 0;
 }
 
+.login-header.tabs { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.tab-buttons { display: flex; gap: 8px; }
+.tab-buttons :deep(.el-button) { font-size: 16px; padding: 8px 14px; }
+
 .login-header h3 {
   font-size: 28px;
   margin: 0 0 10px 0;
@@ -462,7 +487,7 @@ const handleLogin = async () => {
 }
 
 .login-form :deep(.el-form-item) {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .login-form :deep(.el-input__wrapper) {
@@ -482,6 +507,8 @@ const handleLogin = async () => {
   border-radius: 8px;
   margin-top: 10px;
 }
+.login-card .panel-content { padding: 6px 20px 24px; }
+.panel-content { width: 100%; }
 
 .home-footer {
   max-height: 80px;

@@ -93,15 +93,15 @@
             </div>
             <div class="header-right">
               <el-button
-                v-if="selectedRows.length > 0"
                 type="success"
+                :disabled="selectedRows.length === 0"
                 @click="openReviewDialog"
                 class="action-btn"
               >
                 批量审核
               </el-button>
               <el-button
-                v-if="selectedRows.length > 0 && canAssign"
+                :disabled="selectedRows.length === 0 || !canAssign"
                 type="warning"
                 @click="openAssignDialog"
                 class="action-btn"
@@ -205,8 +205,11 @@
     <el-dialog
       v-model="detailDialogVisible"
       title="报名详情"
-      width="800px"
+      width="900px"
+      align-center
+      append-to-body
       :close-on-click-modal="false"
+      class="detail-dialog"
     >
       <div v-if="currentDetail" class="detail-content">
         <el-descriptions :column="2" border>
@@ -411,6 +414,7 @@ const currentDetail = ref<TeamRecruitmentInfo | null>(null)
 const reviewDialogVisible = ref(false)
 const reviewLoading = ref(false)
 const isBatchReview = ref(false)
+const reviewTargetRows = ref<TeamRecruitmentInfo[]>([])
 const reviewForm = reactive({
   stage: '1' as '1' | '2',
   pass: true,
@@ -530,6 +534,7 @@ const openReviewDialog = () => {
     ElMessage.warning('请先选择要审核的记录')
     return
   }
+  reviewTargetRows.value = [...selectedRows.value]
   isBatchReview.value = true
   reviewForm.stage = '1'
   reviewForm.pass = true
@@ -538,7 +543,7 @@ const openReviewDialog = () => {
 }
 
 const openSingleReviewDialog = (row: TeamRecruitmentInfo) => {
-  selectedRows.value = [row]
+  reviewTargetRows.value = [row]
   isBatchReview.value = false
   // 根据当前状态自动设置面试轮次
   if (row.status === 'pending_review') {
@@ -554,14 +559,14 @@ const openSingleReviewDialog = (row: TeamRecruitmentInfo) => {
 }
 
 const handleConfirmReview = async () => {
-  if (selectedRows.value.length === 0) {
+  if (reviewTargetRows.value.length === 0) {
     ElMessage.warning('请先选择要审核的记录')
     return
   }
 
   try {
     reviewLoading.value = true
-    const studentIds = selectedRows.value.map((row) => row.student_id)
+    const studentIds = reviewTargetRows.value.map((row) => row.student_id)
     const params: ReviewStageParams = {
       year: pagination.year,
       student_ids: studentIds,
@@ -571,7 +576,7 @@ const handleConfirmReview = async () => {
     }
     await recruitmentApi.reviewStage(params)
     reviewDialogVisible.value = false
-    selectedRows.value = []
+    reviewTargetRows.value = []
     await loadData()
   } catch (error) {
     console.error('审核失败:', error)
@@ -794,8 +799,31 @@ onMounted(() => {
 }
 
 .detail-content {
-  max-height: 600px;
+  max-height: 68vh;
   overflow-y: auto;
+}
+
+.detail-dialog :deep(.el-dialog) {
+  margin: 0 auto;
+}
+
+.detail-dialog :deep(.el-dialog__body) {
+  padding-top: 8px;
+}
+
+.detail-dialog :deep(.el-descriptions__label) {
+  white-space: nowrap;
+  width: 170px;
+  min-width: 170px;
+}
+
+.detail-dialog :deep(.el-descriptions__content) {
+  word-break: break-word;
+}
+
+.detail-dialog :deep(.el-tag) {
+  margin-right: 8px;
+  margin-bottom: 6px;
 }
 
 .text-content {

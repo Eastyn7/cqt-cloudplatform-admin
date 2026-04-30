@@ -10,6 +10,7 @@
  */
 
 import { request } from '../request'
+import type { RequestConfig } from '../request/types'
 import type {
   OssSTSResponse,
   SendEmailCodeParams,
@@ -57,6 +58,7 @@ import type {
   BackboneMemberPageParams,
   BackboneMemberPageResponse,
   BackboneMemberListResponse,
+  BackboneMemberIdentityResponse,
   BackboneMemberTreeResponse,
   UpdateBackboneMemberParams,
   BatchCreateBackboneMemberParams,
@@ -117,7 +119,10 @@ import type {
   OperationLogQueryParams,
   OperationLogInfo,
   OperationLogListResponse,
+  RecruitmentType,
   SubmitRecruitmentParams,
+  RecruitmentMyApplicationResponse,
+  RecruitmentUserStatusResponse,
   RecruitmentListResponse,
   DepartmentApplicantsResponse,
   ReviewStageParams,
@@ -253,7 +258,7 @@ export const authApi = {
   login: (params: LoginParams) =>
     request.post<LoginResponse>('/public/auth/login', params, {
       skipAuth: true, // 公共接口，不需要鉴权
-      showSuccess: true,
+      showSuccess: false,
     }),
 
   /**
@@ -380,9 +385,10 @@ export const departmentApi = {
    * 创建部门（超管）
    * 创建一个新的部门（名称唯一）
    */
-  create: (params: CreateDepartmentParams) =>
+  create: (params: CreateDepartmentParams, config?: RequestConfig) =>
     request.post<CreateDepartmentResponse>('/departments/create', params, {
-      showSuccess: true,
+      ...config,
+      showSuccess: false,
     }),
 
   /**
@@ -420,9 +426,10 @@ export const departmentApi = {
    * @param dept_id 部门主键ID
    * @param params 要更新的字段（所有字段均为可选）
    */
-  update: (dept_id: number, params: UpdateDepartmentParams) =>
+  update: (dept_id: number, params: UpdateDepartmentParams, config?: RequestConfig) =>
     request.put<{ message: string }>(`/departments/update/${dept_id}`, params, {
-      showSuccess: true,
+      ...config,
+      showSuccess: false,
     }),
 
   /**
@@ -440,9 +447,10 @@ export const departmentApi = {
    * 仅限 superadmin 使用，批量创建多个部门（自动跳过已存在的名称）
    * @param departments 部门信息数组
    */
-  batchCreate: (departments: BatchCreateDepartmentParams[]) =>
+  batchCreate: (departments: BatchCreateDepartmentParams[], config?: RequestConfig) =>
     request.post<BatchCreateDepartmentResponse>('/departments/batch-create', departments, {
-      showSuccess: true,
+      ...config,
+      showSuccess: false,
     }),
 }
 
@@ -527,9 +535,10 @@ export const backboneMemberApi = {
    * admin / superadmin 可使用
    * 创建一个新的骨干成员（届次内学号唯一）
    */
-  create: (params: CreateBackboneMemberParams) =>
+  create: (params: CreateBackboneMemberParams, config?: RequestConfig) =>
     request.post<CreateBackboneMemberResponse>('/backbone-members/create', params, {
-      showSuccess: true,
+      ...config,
+      showSuccess: false,
     }),
 
   /**
@@ -550,6 +559,13 @@ export const backboneMemberApi = {
     request.get<BackboneMemberListResponse>('/public/backbone-members/all', {
       skipAuth: true, // 公共接口，不需要鉴权
     }),
+
+  /**
+   * 查询当前用户骨干身份
+   * 受保护接口，返回当前登录用户是否存在于当前届次的骨干成员表中
+   */
+  getMyIdentity: () =>
+    request.get<BackboneMemberIdentityResponse>('/backbone-members/me'),
 
   /**
    * 获取骨干成员树状结构
@@ -625,9 +641,10 @@ export const backboneMemberApi = {
    * @param member_id 骨干成员主键ID
    * @param params 要更新的字段（所有字段均为可选）
    */
-  update: (member_id: number, params: UpdateBackboneMemberParams) =>
+  update: (member_id: number, params: UpdateBackboneMemberParams, config?: RequestConfig) =>
     request.put<{ message: string }>(`/backbone-members/update/${member_id}`, params, {
-      showSuccess: true,
+      ...config,
+      showSuccess: false,
     }),
 
   /**
@@ -645,9 +662,10 @@ export const backboneMemberApi = {
    * 仅限 admin 使用，批量创建多个骨干成员，返回创建/失败详情
    * @param members 骨干成员信息数组
    */
-  batchCreate: (members: BatchCreateBackboneMemberParams[]) =>
+  batchCreate: (members: BatchCreateBackboneMemberParams[], config?: RequestConfig) =>
     request.post<BatchCreateBackboneMemberResponse>('/backbone-members/batch-create', members, {
-      showSuccess: true,
+      ...config,
+      showSuccess: false,
     }),
 }
 
@@ -832,9 +850,10 @@ export const activityParticipantApi = {
    * @param record_id 报名记录主键ID
    * @param params 签到状态
    */
-  signIn: (record_id: number, params: SignInActivityParams) =>
+  signIn: (record_id: number, params: SignInActivityParams, config?: RequestConfig) =>
     request.patch<{ message: string }>(`/activity-participants/signin/${record_id}`, params, {
       showSuccess: true,
+      ...config,
     }),
 
   /**
@@ -852,17 +871,19 @@ export const activityParticipantApi = {
    * 审核报名（单个，管理员）
    * @param record_id 报名记录主键ID
    */
-  approve: (record_id: number, params: ApproveActivityParticipantParams) =>
+  approve: (record_id: number, params: ApproveActivityParticipantParams, config?: RequestConfig) =>
     request.patch<ApproveActivityParticipantResponse>(`/activity-participants/approve/${record_id}`, params, {
       showSuccess: true,
+      ...config,
     }),
 
   /**
    * 批量审核报名（管理员）
    */
-  batchApprove: (params: BatchApproveActivityParticipantParams) =>
+  batchApprove: (params: BatchApproveActivityParticipantParams, config?: RequestConfig) =>
     request.put<BatchApproveActivityParticipantResponse>('/activity-participants/approve/batch', params, {
       showSuccess: true,
+      ...config,
     }),
 
   /**
@@ -1255,12 +1276,27 @@ export const operationLogApi = {
 
 export const recruitmentApi = {
   /**
+   * 获取当前登录用户报名身份与资格信息
+   */
+  getUserStatus: () => request.get<RecruitmentUserStatusResponse>('/team-recruitment/user-status'),
+
+  /**
+   * 获取当前登录用户的报名详情（用于表单回显和检查是否已提交）
+   * @param year 报名年度（必填）
+   * @param type 报名类型：new_student 或 internal_election（必填）
+   */
+  getMyApplication: (year: number, type: RecruitmentType) =>
+    request.get<RecruitmentMyApplicationResponse>('/team-recruitment/me', {
+      params: { year, type },
+    }),
+
+  /**
    * 学生提交报名
    * user / admin / superadmin 可使用
    */
   submitApplication: (params: SubmitRecruitmentParams) =>
     request.post('/team-recruitment/create', params, {
-      showSuccess: true,
+      showSuccess: false,
     }),
 
   /**

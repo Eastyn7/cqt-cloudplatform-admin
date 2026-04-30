@@ -9,7 +9,7 @@
               :model="searchForm"
               inline
               label-width="0"
-              @submit.prevent
+              @submit.prevent="handleSearch"
               class="search-form"
             >
               <el-form-item>
@@ -17,6 +17,7 @@
                   v-model="searchForm.keyword"
                   placeholder="搜索学号或姓名"
                   clearable
+                  @keydown.enter.prevent="handleSearch"
                   @keyup.enter="handleSearch"
                   class="search-input"
                 >
@@ -118,13 +119,20 @@
         @closed="handleAddDialogClosed"
       >
         <div class="set-admin-dialog-scroll">
-          <el-form :model="setAdminForm" label-width="100px" class="set-admin-form" height="100%">
+          <el-form
+            :model="setAdminForm"
+            label-width="100px"
+            class="set-admin-form"
+            height="100%"
+            @submit.prevent="handleSearchUsers"
+          >
             <el-form-item label="搜索用户">
               <el-input
                 v-model="setAdminForm.searchQuery"
                 placeholder="输入学号或姓名搜索用户"
                 clearable
                 @input="handleSearchUsers"
+                @keydown.enter.prevent="handleSearchUsers"
                 class="search-user-input"
               >
                 <template #prefix>

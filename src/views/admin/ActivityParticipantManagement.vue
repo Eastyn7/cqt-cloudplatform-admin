@@ -229,7 +229,13 @@
                   <el-button type="primary" link size="small" @click="openDetail(row)">
                     查看详情
                   </el-button>
-                  <el-button type="success" link size="small" @click="handleSignIn(row)">
+                  <el-button
+                    type="success"
+                    link
+                    size="small"
+                    :disabled="!canToggleSignIn(row)"
+                    @click="handleSignIn(row)"
+                  >
                     确认到场
                   </el-button>
                   <el-button type="warning" link size="small" @click="openHoursDialog(row)">
@@ -435,7 +441,7 @@ const signInDisabled = computed(() => {
   if (!selectedRows.value.length) {
     return true
   }
-  return selectedRows.value.every((row) => row.signed_in === 1)
+  return !selectedRows.value.some((row) => canToggleSignIn(row) && row.signed_in !== 1)
 })
 
 // 移除前端分页监听，现在分页在后端进行
@@ -463,6 +469,12 @@ const getSignupStatusType = (
     已拒绝: 'danger',
   }
   return status ? map[status] : 'warning'
+}
+
+const isApprovedSignup = (status?: string | null) => (status || '待审核') === '已同意'
+
+const canToggleSignIn = (row: StudentActivityRecord) => {
+  return isApprovedSignup(row.status)
 }
 
 const getActivityStatusLabel = (status: string): string => {
@@ -627,6 +639,10 @@ const openDetail = (row: StudentActivityRecord) => {
 }
 
 const handleSignIn = (row: StudentActivityRecord) => {
+  if (!canToggleSignIn(row)) {
+    ElMessage.warning('仅审核通过的报名可确认到场')
+    return
+  }
   const target = row.signed_in === 1 ? 0 : 1
   const label = target === 1 ? '签到' : '取消签到'
   ElMessageBox.confirm(`确定要为该记录执行「${label}」操作吗？`, '确认', {
@@ -634,8 +650,8 @@ const handleSignIn = (row: StudentActivityRecord) => {
   })
     .then(async () => {
       try {
-        await activityParticipantApi.signIn(row.record_id, { signed_in: target })
-        ElMessage.success('签到状态已更新')
+        await activityParticipantApi.signIn(row.record_id, { signed_in: target }, { showSuccess: false })
+        ElMessage.success(target === 1 ? '已确认到场' : '已取消到场')
         await loadData()
       } catch (error) {
         console.error('更新签到状态失败:', error)
@@ -661,14 +677,14 @@ const submitApprovals = async (
       await activityParticipantApi.approve(rows[0].record_id, {
         approved,
         approval_reason,
-      })
+      }, { showSuccess: false })
     } else {
       const approvals = rows.map((row) => ({
         record_id: row.record_id,
         approved,
         approval_reason,
       }))
-      await activityParticipantApi.batchApprove({ approvals })
+      await activityParticipantApi.batchApprove({ approvals }, { showSuccess: false })
     }
     ElMessage.success(approved ? '已同意所选报名' : '已拒绝所选报名')
     await loadData()
@@ -719,9 +735,16 @@ const handleBulkSignIn = () => {
     return
   }
 
-  // 统计已签到和未签到的记录
-  const signedIn = selectedRows.value.filter((row) => row.signed_in === 1)
-  const notSignedIn = selectedRows.value.filter((row) => row.signed_in !== 1)
+  const ineligible = selectedRows.value.filter((row) => !canToggleSignIn(row))
+  const eligible = selectedRows.value.filter((row) => canToggleSignIn(row))
+
+  if (!eligible.length) {
+    ElMessage.warning('所选记录里没有已审核通过、可确认到场的报名')
+    return
+  }
+
+  const signedIn = eligible.filter((row) => row.signed_in === 1)
+  const notSignedIn = eligible.filter((row) => row.signed_in !== 1)
 
   let message = ''
   if (signedIn.length > 0 && notSignedIn.length > 0) {
@@ -731,6 +754,10 @@ const handleBulkSignIn = () => {
   } else {
     ElMessage.info('选中的记录均已签到')
     return
+  }
+
+  if (ineligible.length > 0) {
+    message += `\n已自动忽略 ${ineligible.length} 条未审核通过的记录。`
   }
 
   ElMessageBox.confirm(message, '批量签到确认', {
@@ -743,11 +770,11 @@ const handleBulkSignIn = () => {
         
         // 临时方案：逐条调用单个签到接口（等后端提供批量签到接口后替换）
         const promises = notSignedIn.map((row) =>
-          activityParticipantApi.signIn(row.record_id, { signed_in: 1 })
+          activityParticipantApi.signIn(row.record_id, { signed_in: 1 }, { showSuccess: false })
         )
         await Promise.all(promises)
         
-        ElMessage.success(`已将 ${notSignedIn.length} 条记录改为已签到`)
+        ElMessage.success(`已将 ${notSignedIn.length} 条审核通过记录改为已签到`)
         selectedRows.value = []
         await loadData()
       } catch (error) {
@@ -1046,6 +1073,7 @@ onMounted(async () => {
 
 .table-card :deep(.el-card__body) {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1152,12 +1180,16 @@ onMounted(async () => {
 
 .table-wrapper {
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  padding: 16px;
+  padding: 16px 16px 0;
 }
 
 .table-wrapper :deep(.el-empty) {
   height: 100%;
+  flex: 1;
 }
 
 .table-wrapper :deep(.el-table__row) {
@@ -1165,10 +1197,16 @@ onMounted(async () => {
 }
 
 .table-wrapper :deep(.el-table) {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .table-wrapper :deep(.el-table__body-wrapper) {
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -1178,6 +1216,7 @@ onMounted(async () => {
   border-top: 1px solid #ebeef5;
   display: flex;
   justify-content: flex-end;
+  flex: 0 0 auto;
   background-color: #ffffffac;
 }
 

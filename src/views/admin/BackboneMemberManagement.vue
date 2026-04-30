@@ -775,7 +775,6 @@ const handleDetailSave = async () => {
       payload.photo_key = ''
     }
     await backboneMemberApi.update(detailForm.member_id, payload)
-    ElMessage.success('骨干成员信息已更新')
     detailVisible.value = false
     resetDetailForm()
     await loadData()

@@ -152,6 +152,13 @@ const MENU_SECTIONS: MenuNode[] = [
     icon: DataLine,
   },
   {
+    key: 'election-entry',
+    label: '换届竞选',
+    index: '/admin/election',
+    roles: ['admin', 'superadmin'],
+    icon: Medal,
+  },
+  {
     key: 'personal-certificate',
     label: '个人中心',
     roles: ['admin', 'superadmin'],

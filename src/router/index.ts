@@ -253,6 +253,16 @@ const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'election',
+        name: 'admin-election',
+        component: () => import('../views/user/ElectionRecruitmentView.vue'),
+        meta: {
+          title: '换届竞选',
+          requiresAuth: true,
+          roles: ['admin', 'superadmin'],
+        },
+      },
+      {
         path: 'task-config',
         name: 'admin-task-config',
         component: () => import('../views/admin/TaskConfigManagement.vue'),
@@ -369,6 +379,26 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../views/user/UserProfileView.vue'),
         meta: {
           title: '个人中心',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'recruitment',
+        name: 'user-recruitment',
+        component: () => import('../views/user/NewRecruitmentView.vue'),
+        meta: {
+          title: '新生报名',
+          requiresAuth: true,
+          roles: ['user', 'admin', 'superadmin'],
+        },
+      },
+      {
+        path: 'election',
+        name: 'user-election',
+        component: () => import('../views/user/ElectionRecruitmentView.vue'),
+        meta: {
+          title: '换届竞选',
           requiresAuth: true,
           roles: ['user', 'admin', 'superadmin'],
         },

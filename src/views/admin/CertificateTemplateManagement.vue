@@ -99,21 +99,13 @@
               <template #default="{ row }">
                 <el-button link type="primary" @click="openEditor(row)">编辑</el-button>
                 <el-button
-                  v-if="!row.enabled"
-                  link
-                  type="success"
-                  @click="handleActivateTemplate(row)"
-                >
-                  设为生效
-                </el-button>
-                <el-button
                   link
                   :type="row.enabled ? 'warning' : 'success'"
                   @click="toggleTemplate(row)"
                 >
                   {{ row.enabled ? '停用' : '启用' }}
                 </el-button>
-                <el-button link type="danger" @click="removeTemplate(row)">删除</el-button>
+                <el-button link type="danger" :disabled="row.enabled" @click="removeTemplate(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -1214,14 +1206,10 @@ const saveTemplate = async () => {
 const toggleTemplate = async (template: CertificateTemplateInfo) => {
   const nextEnabled = template.enabled ? 0 : 1
   try {
-    if (nextEnabled === 1) {
-      await certificateTemplateApi.activate(template.template_id)
-    } else {
-      await certificateTemplateApi.update(template.template_id, {
-        enabled: 0,
-        activate_now: false,
-      })
-    }
+    await certificateTemplateApi.update(template.template_id, {
+      enabled: nextEnabled,
+      activate_now: nextEnabled === 1,
+    })
     await loadTemplates()
     ElMessage.success('状态已更新')
   } catch (error) {
@@ -1230,18 +1218,12 @@ const toggleTemplate = async (template: CertificateTemplateInfo) => {
   }
 }
 
-const handleActivateTemplate = async (template: CertificateTemplateInfo) => {
-  try {
-    await certificateTemplateApi.activate(template.template_id)
-    await loadTemplates()
-    ElMessage.success('已设为当前生效模板')
-  } catch (error) {
-    console.error('设为生效模板失败:', error)
-    ElMessage.error('设置失败')
-  }
-}
-
 const removeTemplate = async (template: CertificateTemplateInfo) => {
+  if (template.enabled) {
+    ElMessage.warning('启用中的模板不能删除，请先停用后再删除')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       `确认删除模板“${template.template_name}”吗？删除后不可恢复。`,
