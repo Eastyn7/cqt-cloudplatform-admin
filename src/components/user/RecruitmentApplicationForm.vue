@@ -42,23 +42,66 @@
           <el-card class="info-card process-card" shadow="never">
             <template #header>
               <div class="section-header">
-                <span>流程信息</span>
+                <span>{{ flowTitle }}</span>
+                <el-tag :type="flowStatusTagType" effect="plain" size="small">
+                  {{ flowStatusText }}
+                </el-tag>
               </div>
             </template>
 
-            <el-timeline class="flow-timeline">
-              <el-timeline-item
-                v-for="step in flowSteps"
-                :key="step.title"
-                :color="step.color"
-                placement="top"
-              >
-                <div class="flow-step-card">
-                  <div class="flow-step-title">{{ step.title }}</div>
-                  <div class="flow-step-desc">{{ step.description }}</div>
+            <div class="flow-progress-panel">
+              <div class="flow-hero-card">
+                <div class="flow-hero-badge">{{ flowStatusText }}</div>
+                <div class="flow-hero-title">{{ flowStageTitle }}</div>
+                <div class="flow-hero-desc">{{ flowStageDescription }}</div>
+
+                <div class="flow-hero-meta">
+                  <div class="flow-hero-meta-item">
+                    <span class="flow-hero-meta-label">当前阶段</span>
+                    <span class="flow-hero-meta-value">
+                      {{ currentFlowStepNumber }} / {{ flowSteps.length }}
+                    </span>
+                  </div>
+                  <div class="flow-hero-meta-item">
+                    <span class="flow-hero-meta-label">流程进度</span>
+                    <span class="flow-hero-meta-value">{{ flowProgressPercent }}%</span>
+                  </div>
                 </div>
-              </el-timeline-item>
-            </el-timeline>
+
+                <el-progress
+                  :percentage="flowProgressPercent"
+                  :status="flowProgressStatus"
+                  :stroke-width="10"
+                  class="flow-hero-progress"
+                />
+              </div>
+
+              <div v-if="flowSteps.length" class="flow-roadmap">
+                <div class="flow-roadmap-track" />
+                <div
+                  v-for="(step, index) in flowSteps"
+                  :key="step.key"
+                  :class="['flow-roadmap-card', `is-${step.state}`]"
+                >
+                  <div class="flow-roadmap-card-top">
+                    <div class="flow-roadmap-number">{{ index + 1 }}</div>
+                    <el-tag size="small" :type="getFlowStepTagType(step.state)" effect="plain">
+                      {{ getFlowStepStateLabel(step.state) }}
+                    </el-tag>
+                  </div>
+
+                  <div class="flow-roadmap-title">{{ step.title }}</div>
+                  <div class="flow-roadmap-desc">{{ step.description }}</div>
+
+                  <div class="flow-roadmap-foot">
+                    <span class="flow-roadmap-foot-label">{{ flowRoadmapFootLabel(step.state) }}</span>
+                    <span class="flow-roadmap-foot-dot" />
+                  </div>
+                </div>
+              </div>
+
+              <el-empty v-else description="暂无流程信息" />
+            </div>
           </el-card>
         </div>
 
@@ -276,6 +319,7 @@ import { departmentApi, recruitmentApi } from '@/utils/api'
 import type {
   DepartmentInfo,
   RecruitmentType,
+  RecruitmentStatus,
   RecruitmentMyApplicationRecord,
   SubmitRecruitmentParams,
   UserInfo,
@@ -301,6 +345,15 @@ const departmentOptions = ref<DepartmentInfo[]>([])
 const hasSubmitted = ref(false)
 
 const skillTags = ref<string[]>([])
+
+type FlowStepState = 'finish' | 'process' | 'wait' | 'error'
+
+interface FlowStepView {
+  key: string
+  title: string
+  description: string
+  state: FlowStepState
+}
 
 // 使用 userStore 中已加载的 recruitmentUserStatus，避免重复调用
 const userStatus = computed(() => userStore.recruitmentUserStatus)
@@ -371,36 +424,234 @@ const modeConfig = computed(() => {
   }
 })
 
-const flowSteps = computed(() => {
-  // 只显示当前用户有资格的通道的步骤
-  const eligibleChannels = userStatus.value?.open_channels.filter(c => {
-    if (props.mode === 'new_student') {
-      return c.type === 'new_student'
-    } else {
-      return c.type === 'internal_election'
-    }
-  }) || []
-  
-  if (eligibleChannels.length === 0) {
-    return []
-  }
+const recruitmentStatusLabelMap: Record<RecruitmentStatus, string> = {
+  pending_review: '待审核',
+  interview1_passed: '一轮通过',
+  interview1_failed: '一轮未通过',
+  interview2_passed: '二轮通过',
+  interview2_failed: '二轮未通过',
+  pending_assignment: '待分配',
+  assigned: '已录取',
+  rejected: '已拒绝',
+}
 
+const recruitmentStatusTagTypeMap: Record<
+  RecruitmentStatus,
+  'success' | 'warning' | 'info' | 'danger' | 'primary'
+> = {
+  pending_review: 'info',
+  interview1_passed: 'primary',
+  interview1_failed: 'danger',
+  interview2_passed: 'primary',
+  interview2_failed: 'danger',
+  pending_assignment: 'warning',
+  assigned: 'success',
+  rejected: 'danger',
+}
+
+const flowDefinition = computed(() => {
   if (props.mode === 'new_student') {
     return [
-      { title: '确认报名通道', description: '当前页面仅对普通志愿者开放，进入前请确认身份与通道是否匹配。', color: '#1989fa' },
-      { title: '填写基础信息', description: '完善学号、姓名、学院、专业、联系方式和技能标签。', color: '#1989fa' },
-      { title: '提交申请表', description: '提交后将进入后端审核流程，期间请保持联系方式畅通。', color: '#1989fa' },
-      { title: '等待审核结果', description: '审核通过后，系统会依据安排进入后续分配。', color: '#1989fa' },
-    ]
+      { key: 'draft', title: '填写报名资料', description: '先完成表单并提交，系统才会进入审核流程。' },
+      { key: 'review1', title: '第一轮审核', description: '管理员核对基础信息、报名条件和部门意向。' },
+      { key: 'review2', title: '第二轮审核', description: '通过一轮后进入二轮审核，继续评估综合表现。' },
+      { key: 'assignment', title: '待分配', description: '审核通过后等待最终部门分配。' },
+      { key: 'result', title: '最终结果', description: '系统会显示已录取或未通过的最终状态。' },
+    ] as const
   }
 
   return [
-    { title: '确认身份范围', description: '当前页面面向骨干成员。', color: '#1989fa' },
-    { title: '填写竞选信息', description: '补充当前职务、竞选岗位和工作计划，便于审核判断。', color: '#1989fa' },
-    { title: '提交竞选材料', description: '提交后进入审核流程，竞选材料会作为后续评审依据。', color: '#1989fa' },
-    { title: '等待任命结果', description: '通过审核后进入最终任命或分配阶段。', color: '#1989fa' },
-  ]
+    { key: 'draft', title: '填写竞选材料', description: '先完善当前职务、竞选岗位和工作计划。' },
+    { key: 'review', title: '竞选审核', description: '管理员会根据竞选材料判断是否进入下一阶段。' },
+    { key: 'assignment', title: '待任命', description: '审核通过后等待最终岗位任命。' },
+    { key: 'result', title: '最终结果', description: '系统会显示已录取或未通过的最终状态。' },
+  ] as const
 })
+
+const getCurrentApplicationStatus = (): RecruitmentStatus | 'draft' => {
+  if (!hasSubmitted.value) return 'draft'
+  return myApplication.value?.status || 'pending_review'
+}
+
+const flowSteps = computed<FlowStepView[]>(() => {
+  const status = getCurrentApplicationStatus()
+
+  if (props.mode === 'new_student') {
+    const states: Record<RecruitmentStatus | 'draft', FlowStepState[]> = {
+      draft: ['process', 'wait', 'wait', 'wait', 'wait'],
+      pending_review: ['finish', 'process', 'wait', 'wait', 'wait'],
+      interview1_passed: ['finish', 'finish', 'process', 'wait', 'wait'],
+      interview1_failed: ['finish', 'error', 'wait', 'wait', 'wait'],
+      interview2_passed: ['finish', 'finish', 'finish', 'process', 'wait'],
+      interview2_failed: ['finish', 'finish', 'error', 'wait', 'wait'],
+      pending_assignment: ['finish', 'finish', 'finish', 'process', 'wait'],
+      assigned: ['finish', 'finish', 'finish', 'finish', 'finish'],
+      rejected: ['finish', 'finish', 'finish', 'finish', 'error'],
+    }
+
+    return flowDefinition.value.map((step, index) => ({
+      ...step,
+      state: states[status][index] || 'wait',
+    }))
+  }
+
+  const states: Record<RecruitmentStatus | 'draft', FlowStepState[]> = {
+    draft: ['process', 'wait', 'wait', 'wait'],
+    pending_review: ['finish', 'process', 'wait', 'wait'],
+    interview1_passed: ['finish', 'finish', 'process', 'wait'],
+    interview1_failed: ['finish', 'error', 'wait', 'wait'],
+    interview2_passed: ['finish', 'finish', 'process', 'wait'],
+    interview2_failed: ['finish', 'error', 'wait', 'wait'],
+    pending_assignment: ['finish', 'finish', 'process', 'wait'],
+    assigned: ['finish', 'finish', 'finish', 'finish'],
+    rejected: ['finish', 'finish', 'finish', 'error'],
+  }
+
+  return flowDefinition.value.map((step, index) => ({
+    ...step,
+    state: states[status][index] || 'wait',
+  }))
+})
+
+const currentFlowStepIndex = computed(() => {
+  const activeIndex = flowSteps.value.findIndex(
+    (step) => step.state === 'process' || step.state === 'error'
+  )
+  if (activeIndex !== -1) return activeIndex
+  const lastFinishedIndex = [...flowSteps.value].reverse().findIndex((step) => step.state === 'finish')
+  if (lastFinishedIndex === -1) return 0
+  return flowSteps.value.length - 1 - lastFinishedIndex
+})
+
+const currentFlowStepNumber = computed(() => currentFlowStepIndex.value + 1)
+
+const currentFlowStep = computed(() => flowSteps.value[currentFlowStepIndex.value] || flowSteps.value[0] || null)
+
+const currentApplicationStatusLabel = computed(() => {
+  const status = getCurrentApplicationStatus()
+  if (status === 'draft') return '未提交'
+  return recruitmentStatusLabelMap[status]
+})
+
+const flowTitle = computed(() => (props.mode === 'new_student' ? '新生报名流程' : '换届竞选流程'))
+
+const flowStatusText = computed(() => {
+  if (!hasSubmitted.value) return '未提交'
+  return currentApplicationStatusLabel.value
+})
+
+const flowStatusTagType = computed(() => {
+  const status = getCurrentApplicationStatus()
+  if (status === 'draft') return 'info'
+  return recruitmentStatusTagTypeMap[status] || 'info'
+})
+
+const flowStageTitle = computed(() => {
+  if (!hasSubmitted.value) return '当前还未提交报名'
+  return currentFlowStep.value?.title || '流程进行中'
+})
+
+const flowStageDescription = computed(() => {
+  const status = getCurrentApplicationStatus()
+  if (status === 'draft') {
+    return '请先完成表单提交，提交后这里会自动显示你的报名进度。'
+  }
+  if (status === 'pending_review') {
+    return props.mode === 'new_student'
+      ? '已提交报名，当前处于第一轮审核阶段。'
+      : '已提交竞选材料，当前处于审核阶段。'
+  }
+  if (status === 'interview1_passed') {
+    return props.mode === 'new_student'
+      ? '第一轮审核已通过，正在进入第二轮审核。'
+      : '审核已通过，正在进入待任命阶段。'
+  }
+  if (status === 'interview1_failed') {
+    return '第一轮审核未通过，本次报名流程已结束。'
+  }
+  if (status === 'interview2_passed') {
+    return '第二轮审核已通过，正在等待最终分配。'
+  }
+  if (status === 'interview2_failed') {
+    return '第二轮审核未通过，本次报名流程已结束。'
+  }
+  if (status === 'pending_assignment') {
+    return props.mode === 'new_student'
+      ? '审核已通过，正在等待部门分配。'
+      : '审核已通过，正在等待最终任命。'
+  }
+  if (status === 'assigned') {
+    return '当前报名已完成，结果为已录取。'
+  }
+  if (status === 'rejected') {
+    return '当前报名已完成，结果为未通过。'
+  }
+  return '流程正在推进中，请关注最新状态。'
+})
+
+const flowProgressPercent = computed(() => {
+  const status = getCurrentApplicationStatus()
+  const progressMap: Partial<Record<RecruitmentStatus | 'draft', number>> = props.mode === 'new_student'
+    ? {
+        draft: 8,
+        pending_review: 26,
+        interview1_passed: 48,
+        interview1_failed: 100,
+        interview2_passed: 72,
+        interview2_failed: 100,
+        pending_assignment: 86,
+        assigned: 100,
+        rejected: 100,
+      }
+    : {
+        draft: 10,
+        pending_review: 34,
+        interview1_passed: 64,
+        interview1_failed: 100,
+        interview2_passed: 64,
+        interview2_failed: 100,
+        pending_assignment: 84,
+        assigned: 100,
+        rejected: 100,
+      }
+  return progressMap[status] ?? 0
+})
+
+const flowProgressStatus = computed(() => {
+  const status = getCurrentApplicationStatus()
+  if (status === 'assigned') return 'success'
+  if (status === 'rejected' || status === 'interview1_failed' || status === 'interview2_failed') {
+    return 'exception'
+  }
+  return undefined
+})
+
+const getFlowStepStateLabel = (state: FlowStepState) => {
+  const stateLabelMap: Record<FlowStepState, string> = {
+    finish: '已完成',
+    process: '进行中',
+    wait: '待开始',
+    error: '未通过',
+  }
+  return stateLabelMap[state]
+}
+
+const getFlowStepTagType = (state: FlowStepState): 'success' | 'warning' | 'info' | 'danger' | 'primary' => {
+  const stateTagMap: Record<FlowStepState, 'success' | 'warning' | 'info' | 'danger' | 'primary'> = {
+    finish: 'success',
+    process: 'primary',
+    wait: 'info',
+    error: 'danger',
+  }
+  return stateTagMap[state]
+}
+
+const flowRoadmapFootLabel = (state: FlowStepState) => {
+  if (state === 'finish') return '已完成'
+  if (state === 'process') return '进行中'
+  if (state === 'error') return '需关注'
+  return '等待中'
+}
 
 const reasonLabel = computed(() => modeConfig.value.reasonLabel)
 const reasonPlaceholder = computed(() => modeConfig.value.reasonPlaceholder)
@@ -922,20 +1173,291 @@ onMounted(() => {
   margin-top: 8px;
 }
 
-.flow-timeline :deep(.el-timeline-item) {
-  padding-bottom: 18px;
+.flow-progress-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
 }
 
-.flow-timeline :deep(.el-timeline-item__node) {
-  box-shadow: 0 0 0 4px rgba(25, 137, 250, 0.12);
+.flow-progress-panel::before,
+.flow-progress-panel::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(20px);
+  opacity: 0.8;
 }
 
-.flow-step-card {
-  padding: 14px 16px;
+.flow-progress-panel::before {
+  top: -40px;
+  right: -20px;
+  width: 120px;
+  height: 120px;
+  background: rgba(25, 137, 250, 0.16);
+}
+
+.flow-progress-panel::after {
+  bottom: -40px;
+  left: -20px;
+  width: 140px;
+  height: 140px;
+  background: rgba(17, 197, 172, 0.12);
+}
+
+.flow-hero-card {
+  position: relative;
+  z-index: 1;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  color: #f7fbff;
+  background:
+    linear-gradient(135deg, rgba(18, 52, 112, 0.98), rgba(25, 137, 250, 0.92)),
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 42%);
+  box-shadow: 0 20px 45px rgba(18, 52, 112, 0.24);
+  overflow: hidden;
+}
+
+.flow-hero-card::after {
+  content: '';
+  position: absolute;
+  inset: auto -14px -32px auto;
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  filter: blur(2px);
+}
+
+.flow-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #d8ecff;
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.flow-hero-title {
+  margin-top: 12px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.flow-hero-desc {
+  margin-top: 8px;
+  color: rgba(247, 251, 255, 0.9);
+  line-height: 1.75;
+  font-size: 13px;
+}
+
+.flow-hero-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.flow-hero-meta-item {
+  padding: 12px 12px 11px;
   border-radius: 14px;
-  border: 1px solid rgba(25, 137, 250, 0.1);
-  background: #ffffff;
-  box-shadow: 0 8px 18px rgba(25, 137, 250, 0.06);
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.flow-hero-meta-label {
+  display: block;
+  font-size: 12px;
+  color: rgba(215, 236, 255, 0.82);
+}
+
+.flow-hero-meta-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.flow-hero-progress {
+  margin-top: 14px;
+}
+
+.flow-hero-progress :deep(.el-progress-bar__outer) {
+  background-color: rgba(255, 255, 255, 0.16);
+}
+
+.flow-hero-progress :deep(.el-progress-bar__inner) {
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+.flow-roadmap {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 12px;
+  padding-top: 6px;
+}
+
+.flow-roadmap-track {
+  position: absolute;
+  top: 24px;
+  left: 16px;
+  right: 16px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(25, 137, 250, 0.18), rgba(17, 197, 172, 0.22));
+}
+
+.flow-roadmap-card {
+  position: relative;
+  padding: 16px 14px 14px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  border: 1px solid rgba(25, 137, 250, 0.08);
+  box-shadow: 0 12px 24px rgba(24, 137, 250, 0.06);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+  overflow: hidden;
+}
+
+.flow-roadmap-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 28px rgba(24, 137, 250, 0.1);
+}
+
+.flow-roadmap-card.is-process {
+  border-color: rgba(25, 137, 250, 0.28);
+  box-shadow: 0 16px 30px rgba(25, 137, 250, 0.14);
+}
+
+.flow-roadmap-card.is-finish {
+  background: linear-gradient(180deg, #f4fffb 0%, #eefcf8 100%);
+  border-color: rgba(17, 197, 172, 0.22);
+}
+
+.flow-roadmap-card.is-error {
+  background: linear-gradient(180deg, #fff7f7 0%, #fff0f0 100%);
+  border-color: rgba(245, 108, 108, 0.24);
+}
+
+.flow-roadmap-card.is-wait {
+  opacity: 0.92;
+}
+
+.flow-roadmap-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 5px;
+  height: 100%;
+  background: linear-gradient(180deg, rgba(25, 137, 250, 0.65), rgba(25, 137, 250, 0.1));
+}
+
+.flow-roadmap-card.is-finish::before {
+  background: linear-gradient(180deg, rgba(17, 197, 172, 0.72), rgba(17, 197, 172, 0.12));
+}
+
+.flow-roadmap-card.is-error::before {
+  background: linear-gradient(180deg, rgba(245, 108, 108, 0.78), rgba(245, 108, 108, 0.14));
+}
+
+.flow-roadmap-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.flow-roadmap-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  color: #17315e;
+  background: rgba(25, 137, 250, 0.1);
+}
+
+.flow-roadmap-card.is-process .flow-roadmap-number {
+  color: #ffffff;
+  background: linear-gradient(135deg, #1989fa, #0f67c7);
+}
+
+.flow-roadmap-card.is-finish .flow-roadmap-number {
+  color: #0f7e6d;
+  background: rgba(17, 197, 172, 0.14);
+}
+
+.flow-roadmap-card.is-error .flow-roadmap-number {
+  color: #cf3b3b;
+  background: rgba(245, 108, 108, 0.14);
+}
+
+.flow-roadmap-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #17315e;
+  line-height: 1.45;
+}
+
+.flow-roadmap-desc {
+  margin-top: 8px;
+  color: #5b6b88;
+  line-height: 1.72;
+  font-size: 13px;
+}
+
+.flow-roadmap-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.flow-roadmap-foot-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #7b8aa7;
+}
+
+.flow-roadmap-foot-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1989fa, #11c5ac);
+  box-shadow: 0 0 0 4px rgba(25, 137, 250, 0.08);
+}
+
+.flow-roadmap-card.is-finish .flow-roadmap-foot-dot {
+  background: linear-gradient(135deg, #11c5ac, #2dd4bf);
+  box-shadow: 0 0 0 4px rgba(17, 197, 172, 0.1);
+}
+
+.flow-roadmap-card.is-error .flow-roadmap-foot-dot {
+  background: linear-gradient(135deg, #f56c6c, #ff8f8f);
+  box-shadow: 0 0 0 4px rgba(245, 108, 108, 0.1);
+}
+
+.flow-roadmap-card.is-process .flow-roadmap-foot-dot {
+  background: linear-gradient(135deg, #1989fa, #0f67c7);
+  box-shadow: 0 0 0 4px rgba(25, 137, 250, 0.12);
 }
 
 .flow-step-title {
@@ -949,6 +1471,26 @@ onMounted(() => {
   color: #5b6b88;
   line-height: 1.7;
   font-size: 14px;
+}
+
+@keyframes flowPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+}
+
+.flow-roadmap-card.is-process .flow-roadmap-number,
+.flow-roadmap-card.is-process .flow-roadmap-foot-dot {
+  animation: flowPulse 1.8s ease-in-out infinite;
 }
 
 .application-form {

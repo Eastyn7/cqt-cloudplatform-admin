@@ -36,10 +36,11 @@
       <div class="field-title">或导入 Excel 文件（{{ excelAccept }}）</div>
       <el-upload
         drag
+        action="#"
         :accept="excelAccept"
         :auto-upload="false"
         :show-file-list="false"
-        :before-upload="handleExcelUpload"
+        :on-change="handleExcelUpload"
         :disabled="importLoading"
         class="import-upload"
       >
@@ -63,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import type { UploadRawFile } from 'element-plus'
+import type { UploadFile } from 'element-plus'
 import { readExcelRows } from '@/utils/excel'
 import { useJsonImportWorker } from '@/lib/utils'
 
@@ -161,8 +162,13 @@ const handleImportConfirm = async () => {
   }
 }
 
-// 处理 Excel 文件上传并解析为行数据
-const handleExcelUpload = async (file: UploadRawFile) => {
+// 处理 Excel 文件选择并解析为行数据
+const handleExcelUpload = async (uploadFile: UploadFile) => {
+  const file = uploadFile.raw
+  if (!file) {
+    ElMessage.error('未获取到有效的 Excel 文件')
+    return
+  }
   importLoading.value = true
   try {
     const rows = await readExcelRows<ImportRow>(file, {

@@ -212,74 +212,132 @@
       class="detail-dialog"
     >
       <div v-if="currentDetail" class="detail-content">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="学号">{{ currentDetail.student_id }}</el-descriptions-item>
-          <el-descriptions-item label="姓名">{{ currentDetail.name }}</el-descriptions-item>
-          <el-descriptions-item label="性别">{{ currentDetail.gender }}</el-descriptions-item>
-          <el-descriptions-item label="学院">{{ currentDetail.college }}</el-descriptions-item>
-          <el-descriptions-item label="专业">{{ currentDetail.major }}</el-descriptions-item>
-          <el-descriptions-item label="年级">{{ currentDetail.grade }}</el-descriptions-item>
-          <el-descriptions-item label="联系电话">{{ currentDetail.phone }}</el-descriptions-item>
-          <el-descriptions-item label="邮箱">{{ currentDetail.email }}</el-descriptions-item>
-          <el-descriptions-item label="QQ">{{ currentDetail.qq || '--' }}</el-descriptions-item>
-          <el-descriptions-item label="宿舍">{{
-            currentDetail.dormitory || '--'
-          }}</el-descriptions-item>
-          <el-descriptions-item label="报名类型">
+        <div class="detail-header">
+          <div class="detail-header-main">
+            <div class="detail-name">{{ currentDetail.name }}</div>
+            <div class="detail-subtitle">学号 {{ currentDetail.student_id }}</div>
+          </div>
+          <div class="detail-header-meta">
             <el-tag
+              class="detail-status-tag"
               :type="currentDetail.recruitment_type === 'new_student' ? 'primary' : 'success'"
             >
               {{ currentDetail.recruitment_type === 'new_student' ? '新生纳新' : '换届竞选' }}
             </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="getStatusTagType(currentDetail.status)">
+            <el-tag class="detail-status-tag" :type="getStatusTagType(currentDetail.status)">
               {{ getStatusLabel(currentDetail.status) }}
             </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="第一志愿/竞选部门" :span="2">
-            {{ currentDetail.intention_dept1 }}
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentDetail.intention_dept2" label="第二志愿" :span="2">
-            {{ currentDetail.intention_dept2 }}
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentDetail.current_position" label="当前职务" :span="2">
-            {{ currentDetail.current_position }}
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentDetail.election_position" label="竞选职务" :span="2">
-            {{ currentDetail.election_position }}
-          </el-descriptions-item>
-          <el-descriptions-item label="自我介绍" :span="2">
-            <div class="text-content">{{ currentDetail.self_intro || '--' }}</div>
-          </el-descriptions-item>
-          <el-descriptions-item label="过往经历" :span="2">
-            <div class="text-content">{{ currentDetail.past_experience || '--' }}</div>
-          </el-descriptions-item>
-          <el-descriptions-item label="加入动机/竞选理由" :span="2">
-            <div class="text-content">{{ currentDetail.reason_for_joining || '--' }}</div>
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentDetail.work_plan" label="工作计划" :span="2">
-            <div class="text-content">{{ currentDetail.work_plan }}</div>
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentDetail.skill_tags" label="技能标签" :span="2">
-            <el-tag
-              v-for="tag in parseSkillTags(currentDetail.skill_tags)"
-              :key="tag"
-              style="margin-right: 8px"
-            >
-              {{ tag }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentDetail.final_department" label="最终部门" :span="2">
-            {{ currentDetail.final_department }}
-          </el-descriptions-item>
-          <el-descriptions-item v-if="currentDetail.final_position" label="最终职务" :span="2">
-            {{ currentDetail.final_position }}
-          </el-descriptions-item>
-          <el-descriptions-item label="提交时间" :span="2">
-            {{ dateUtil.formatTime(currentDetail.created_at) }}
-          </el-descriptions-item>
-        </el-descriptions>
+          </div>
+        </div>
+
+        <section class="detail-section">
+          <div class="detail-section-title">基本信息</div>
+          <div class="detail-grid detail-grid--compact">
+            <div class="detail-field">
+              <div class="detail-label">性别</div>
+              <div class="detail-value">{{ currentDetail.gender || '--' }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">联系电话</div>
+              <div class="detail-value">{{ currentDetail.phone || '--' }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">邮箱</div>
+              <div class="detail-value">{{ currentDetail.email || '--' }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">QQ</div>
+              <div class="detail-value">{{ currentDetail.qq || '--' }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">学院</div>
+              <div class="detail-value">{{ currentDetail.college || '--' }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">专业</div>
+              <div class="detail-value">{{ currentDetail.major || '--' }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">年级</div>
+              <div class="detail-value">{{ currentDetail.grade || '--' }}</div>
+            </div>
+            <div class="detail-field">
+              <div class="detail-label">宿舍</div>
+              <div class="detail-value">{{ currentDetail.dormitory || '--' }}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <div class="detail-section-title">报名信息</div>
+          <div class="detail-grid detail-grid--wide">
+            <div class="detail-field detail-field--full">
+              <div class="detail-label">第一志愿/竞选部门</div>
+              <div class="detail-value">{{ currentDetail.intention_dept1 || '--' }}</div>
+            </div>
+            <div v-if="currentDetail.intention_dept2" class="detail-field detail-field--full">
+              <div class="detail-label">第二志愿</div>
+              <div class="detail-value">{{ currentDetail.intention_dept2 }}</div>
+            </div>
+            <div v-if="currentDetail.current_position" class="detail-field detail-field--full">
+              <div class="detail-label">当前职务</div>
+              <div class="detail-value">{{ currentDetail.current_position }}</div>
+            </div>
+            <div v-if="currentDetail.election_position" class="detail-field detail-field--full">
+              <div class="detail-label">竞选职务</div>
+              <div class="detail-value">{{ currentDetail.election_position }}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="detail-section">
+          <div class="detail-section-title">内容详情</div>
+          <div class="detail-stack">
+            <div class="detail-panel">
+              <div class="detail-label detail-label--block">自我介绍</div>
+              <div class="text-content">{{ currentDetail.self_intro || '--' }}</div>
+            </div>
+            <div class="detail-panel">
+              <div class="detail-label detail-label--block">过往经历</div>
+              <div class="text-content">{{ currentDetail.past_experience || '--' }}</div>
+            </div>
+            <div class="detail-panel">
+              <div class="detail-label detail-label--block">加入动机/竞选理由</div>
+              <div class="text-content">{{ currentDetail.reason_for_joining || '--' }}</div>
+            </div>
+            <div v-if="currentDetail.work_plan" class="detail-panel">
+              <div class="detail-label detail-label--block">工作计划</div>
+              <div class="text-content">{{ currentDetail.work_plan }}</div>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="currentDetail.skill_tags || currentDetail.final_department || currentDetail.final_position" class="detail-section">
+          <div class="detail-section-title">补充信息</div>
+          <div class="detail-stack">
+            <div v-if="currentDetail.skill_tags" class="detail-panel">
+              <div class="detail-label detail-label--block">技能标签</div>
+              <div class="detail-tags">
+                <el-tag v-for="tag in parseSkillTags(currentDetail.skill_tags)" :key="tag">
+                  {{ tag }}
+                </el-tag>
+              </div>
+            </div>
+            <div v-if="currentDetail.final_department" class="detail-panel detail-panel--inline">
+              <div class="detail-label">最终部门</div>
+              <div class="detail-value">{{ currentDetail.final_department }}</div>
+            </div>
+            <div v-if="currentDetail.final_position" class="detail-panel detail-panel--inline">
+              <div class="detail-label">最终职务</div>
+              <div class="detail-value">{{ currentDetail.final_position }}</div>
+            </div>
+          </div>
+        </section>
+
+        <div class="detail-footer">
+          <span class="detail-footer-label">提交时间</span>
+          <span class="detail-footer-value">{{ dateUtil.formatTime(currentDetail.created_at) }}</span>
+        </div>
       </div>
     </el-dialog>
 
@@ -808,22 +866,160 @@ onMounted(() => {
 }
 
 .detail-dialog :deep(.el-dialog__body) {
-  padding-top: 8px;
+  padding: 16px 20px 20px;
 }
 
-.detail-dialog :deep(.el-descriptions__label) {
+.detail-content {
+  max-height: 68vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid #e8edf3;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(255, 255, 255, 0.98));
+}
+
+.detail-header-main {
+  min-width: 0;
+}
+
+.detail-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.3;
+}
+
+.detail-subtitle {
+  margin-top: 6px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.detail-header-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.detail-section {
+  border: 1px solid #e8edf3;
+  border-radius: 16px;
+  padding: 16px 18px 18px;
+  background: #fff;
+}
+
+.detail-section-title {
+  margin-bottom: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 12px 14px;
+}
+
+.detail-grid--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.detail-grid--wide {
+  grid-template-columns: 1fr;
+}
+
+.detail-field,
+.detail-panel {
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  padding: 12px 14px;
+}
+
+.detail-field {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.detail-field--full,
+.detail-panel--inline {
+  grid-template-columns: 168px minmax(0, 1fr);
+}
+
+.detail-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  line-height: 1.5;
   white-space: nowrap;
-  width: 170px;
-  min-width: 170px;
 }
 
-.detail-dialog :deep(.el-descriptions__content) {
+.detail-label--block {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #111827;
+  line-height: 1.6;
   word-break: break-word;
 }
 
+.detail-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detail-panel--inline {
+  display: grid;
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .detail-dialog :deep(.el-tag) {
-  margin-right: 8px;
-  margin-bottom: 6px;
+  margin-right: 0;
+  margin-bottom: 0;
+}
+
+.detail-status-tag {
+  min-width: 96px;
+  justify-content: center;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.detail-footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 2px 4px 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.detail-footer-label {
+  font-weight: 600;
+  color: #4b5563;
 }
 
 .text-content {
@@ -857,6 +1053,27 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .detail-header {
+    flex-direction: column;
+  }
+
+  .detail-header-meta {
+    justify-content: flex-start;
+  }
+
+  .detail-grid--compact {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-field,
+  .detail-panel--inline {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-label {
+    white-space: normal;
+  }
+
   .search-form {
     flex-direction: column;
     align-items: stretch;
