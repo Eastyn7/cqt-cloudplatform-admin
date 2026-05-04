@@ -12,7 +12,7 @@
                 @submit.prevent
                 class="search-form"
               >
-                <el-form-item v-if="isSuperAdmin">
+                <el-form-item>
                   <el-input-number
                     v-model="searchForm.year"
                     placeholder="年份"
@@ -28,10 +28,8 @@
                   <el-select
                     v-model="searchForm.type"
                     placeholder="报名类型"
-                    clearable
                     class="search-select"
                   >
-                    <el-option label="全部" value="" />
                     <el-option label="新生纳新" value="new_student" />
                     <el-option label="内部换届竞选" value="internal_election" />
                   </el-select>
@@ -164,7 +162,7 @@
                 <span>{{ dateUtil.formatTime(row.created_at) || '--' }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right" align="center">
+            <el-table-column label="操作" width="260" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button type="primary" link @click="openDetailDialog(row)">详情</el-button>
                 <el-button
@@ -182,6 +180,14 @@
                   @click="openSingleAssignDialog(row)"
                 >
                   分配
+                </el-button>
+                <el-button
+                  v-if="isSuperAdmin"
+                  type="danger"
+                  link
+                  @click="handleDelete(row)"
+                >
+                  删除
                 </el-button>
               </template>
             </el-table-column>
@@ -459,7 +465,7 @@ const pagination = reactive({
 
 const searchForm = reactive({
   year: new Date().getFullYear(),
-  type: '' as '' | 'new_student' | 'internal_election',
+  type: 'new_student' as 'new_student' | 'internal_election',
   status: '' as '' | RecruitmentStatus,
   search: '',
 })
@@ -512,6 +518,35 @@ const canAssignSingle = (row: TeamRecruitmentInfo): boolean => {
   return row.status === 'pending_assignment'
 }
 
+const handleDelete = async (row: TeamRecruitmentInfo) => {
+  if (!isSuperAdmin.value) {
+    ElMessage.warning('仅超级管理员可删除报名记录')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除 ${row.name}（${row.student_id}）的报名记录吗？此操作不可恢复。`,
+      '删除确认',
+      {
+        type: 'warning',
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+      }
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await recruitmentApi.delete(row.id)
+    ElMessage.success('删除成功')
+    await loadData()
+  } catch (error) {
+    console.error('删除报名记录失败:', error)
+  }
+}
+
 const getStatusLabel = (status: RecruitmentStatus): string => {
   const statusMap: Record<RecruitmentStatus, string> = {
     pending_review: '待审核',
@@ -561,7 +596,7 @@ const handleSearch = () => {
 
 const handleResetFilters = () => {
   searchForm.year = new Date().getFullYear()
-  searchForm.type = ''
+  searchForm.type = 'new_student'
   searchForm.status = ''
   searchForm.search = ''
   handleSearch()

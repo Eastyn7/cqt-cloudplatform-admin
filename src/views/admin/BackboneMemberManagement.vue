@@ -493,7 +493,7 @@
 <script setup lang="ts">
 import { Camera, Picture, Refresh, Search } from '@element-plus/icons-vue'
 import type { TabPaneName, UploadFile } from 'element-plus'
-import { backboneMemberApi, departmentApi, teamTermApi } from '@/utils/api'
+import { backboneMemberApi, departmentApi, teamTermApi, userInfoApi } from '@/utils/api'
 import type {
   BackboneMemberInfo,
   BackboneMemberPageParams,
@@ -895,13 +895,68 @@ const handleDelete = (row: BackboneMemberInfo) => {
 
 const findMemberById = (memberId: number) => tableData.value.find((m) => m.member_id === memberId)
 
-const openMemberDetailById = (memberId: number) => {
-  const member = findMemberById(memberId)
-  if (member) {
-    openDetail(member)
-  } else {
+const findMemberByStudentId = (studentId: string) =>
+  tableData.value.find((m) => m.student_id === studentId)
+
+const openMemberDetailById = async (memberIdOrStudentId: number | string) => {
+  if (typeof memberIdOrStudentId === 'number') {
+    const member = findMemberById(memberIdOrStudentId)
+    if (member) {
+      openDetail(member)
+      return
+    }
     ElMessage.warning('未找到该成员信息，请刷新列表')
+    return
   }
+
+  // 按学号查找：优先从当前列表查找，找不到时尝试从后端拉取全部骨干成员再次查找，最后降级展示用户基础信息
+  const studentId = String(memberIdOrStudentId)
+  let member = findMemberByStudentId(studentId)
+  if (!member) {
+    try {
+      const res = await backboneMemberApi.getAll()
+      const list = res.data?.list || []
+      member = list.find((m: any) => String(m.student_id) === studentId)
+      // 如果在后端全量列表找到，打开详情并刷新本地列表
+      if (member) {
+        // 可选：将其加入 tableData 以便列表中可见
+        // tableData.value.unshift(member)
+        openDetail(member)
+        return
+      }
+    } catch (error) {
+      console.error('尝试从后端获取骨干成员全量列表失败:', error)
+    }
+  } else {
+    openDetail(member)
+    return
+  }
+
+  // 回退：尝试获取用户公开信息并展示（只读模式，非骨干记录）
+  try {
+    const res = await userInfoApi.getUserInfo(studentId)
+    if (res.data) {
+      // 填充部分字段并打开详情抽屉（member_id 保留为 0，表示非骨干记录）
+      detailForm.member_id = 0
+      detailForm.student_id = res.data.student_id || studentId
+      detailForm.student_name = res.data.name || res.data.student_name || ''
+      detailForm.dept_id = null
+      detailForm.position = ''
+      detailForm.term_id = null
+      detailForm.term_start = ''
+      detailForm.term_end = ''
+      detailForm.remark = ''
+      detailForm.photo_key = res.data.avatar_key || ''
+      detailVisible.value = true
+      await updateDetailAvatarUrl()
+      ElMessage.info('显示用户基础信息（非完整骨干记录），如需编辑请先在成员列表中创建记录。')
+      return
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+
+  ElMessage.warning('未找到该成员信息，请刷新列表')
 }
 
 const deleteMemberById = (memberId: number) => {

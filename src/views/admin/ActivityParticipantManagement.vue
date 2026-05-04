@@ -238,7 +238,13 @@
                   >
                     确认到场
                   </el-button>
-                  <el-button type="warning" link size="small" @click="openHoursDialog(row)">
+                  <el-button
+                    type="warning"
+                    link
+                    size="small"
+                    :disabled="!isApprovedSignup(row.status)"
+                    @click="openHoursDialog(row)"
+                  >
                     修改时长
                   </el-button>
                 </template>
@@ -342,6 +348,7 @@
             v-model="hoursForm.service_hours"
             :min="0"
             :step="0.5"
+            :disabled="!isApprovedSignup(hoursForm.status)"
             style="width: 100%"
           />
         </el-form-item>
@@ -441,7 +448,10 @@ const signInDisabled = computed(() => {
   if (!selectedRows.value.length) {
     return true
   }
-  return !selectedRows.value.some((row) => canToggleSignIn(row) && row.signed_in !== 1)
+  if (selectedRows.value.some((row) => !canToggleSignIn(row))) {
+    return true
+  }
+  return !selectedRows.value.some((row) => row.signed_in !== 1)
 })
 
 // 移除前端分页监听，现在分页在后端进行
@@ -738,6 +748,11 @@ const handleBulkSignIn = () => {
   const ineligible = selectedRows.value.filter((row) => !canToggleSignIn(row))
   const eligible = selectedRows.value.filter((row) => canToggleSignIn(row))
 
+  if (ineligible.length > 0) {
+    ElMessage.warning('所选记录中包含未审核通过的记录，请重新选择后再操作')
+    return
+  }
+
   if (!eligible.length) {
     ElMessage.warning('所选记录里没有已审核通过、可确认到场的报名')
     return
@@ -754,10 +769,6 @@ const handleBulkSignIn = () => {
   } else {
     ElMessage.info('选中的记录均已签到')
     return
-  }
-
-  if (ineligible.length > 0) {
-    message += `\n已自动忽略 ${ineligible.length} 条未审核通过的记录。`
   }
 
   ElMessageBox.confirm(message, '批量签到确认', {
@@ -859,12 +870,14 @@ const hoursForm = reactive<{
   student_name: string
   student_id: string
   service_hours: number | null
+  status?: string | null
 }>({
   record_id: null,
   activity_name: '',
   student_name: '',
   student_id: '',
   service_hours: null,
+  status: null,
 })
 
 const resetHoursForm = () => {
@@ -873,20 +886,32 @@ const resetHoursForm = () => {
   hoursForm.student_name = ''
   hoursForm.student_id = ''
   hoursForm.service_hours = null
+  hoursForm.status = null
 }
 
 const openHoursDialog = (row: StudentActivityRecord) => {
+  // 仅允许已同意的报名修改时长
+  if (!isApprovedSignup(row.status)) {
+    ElMessage.warning('仅已同意的报名可修改服务时长')
+    return
+  }
+
   hoursForm.record_id = row.record_id
   hoursForm.activity_name = row.activity_name
   hoursForm.student_name = row.student_name
   hoursForm.student_id = row.student_id
   hoursForm.service_hours = row.service_hours
+  hoursForm.status = row.status || null
   hoursDialogVisible.value = true
 }
 
 const handleHoursSave = async () => {
   if (!hoursForm.record_id || hoursForm.service_hours == null) {
     ElMessage.warning('请填写服务时长')
+    return
+  }
+  if (!isApprovedSignup(hoursForm.status)) {
+    ElMessage.warning('仅已同意的报名可修改服务时长')
     return
   }
   hoursSaving.value = true

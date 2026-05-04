@@ -253,9 +253,9 @@
         <!-- 底部操作按钮 -->
         <div class="detail-actions">
           <el-button
-            v-if="currentNodeData.member_id"
+            v-if="currentNodeData.member_id || currentNodeData.student_id"
             type="primary"
-            @click="emit('view-member', currentNodeData.member_id)"
+            @click="emit('view-member', currentNodeData.member_id ?? currentNodeData.student_id)"
             >查看完整档案</el-button
           >
           <el-button
@@ -382,7 +382,7 @@ const levelGap = computed(() => (props.simple ? 420 : 700))
 const horizontalGap = computed(() => (props.simple ? 80 : 120))
 
 const emit = defineEmits<{
-  (e: 'view-member', id: number): void
+  (e: 'view-member', id: number | string): void
   (e: 'delete-member', id: number): void
 }>()
 
@@ -660,6 +660,8 @@ const currentTreeData = computed<TreeNode | null>(() => {
         id: `captain-${manager.manager_student_id || manager.manager_name}`,
         label: manager.manager_name || '未知队长',
         type: 'member',
+        student_id: manager.manager_student_id,
+        student_name: manager.manager_name,
         position: '队长',
         children: deptNodes.length > 0 ? deptNodes : undefined,
       }

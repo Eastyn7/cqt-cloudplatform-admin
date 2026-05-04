@@ -453,7 +453,7 @@ const handleSetAdmin = async () => {
         student_id: user.student_id,
         role: user.targetRole,
       })),
-    })
+    }, { showSuccess: false })
     ElMessage.success(`成功设置 ${selectedUsers.value.length} 个用户权限`)
     setAdminDialogVisible.value = false
     await fetchAdmins() // 刷新列表

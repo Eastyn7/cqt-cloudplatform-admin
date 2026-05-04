@@ -1310,6 +1310,15 @@ export const recruitmentApi = {
     }),
 
   /**
+   * 删除报名记录（超级管理员）
+   * @param id 报名记录主键ID
+   */
+  delete: (id: number) =>
+    request.delete<{ message: string; id: number }>(`/team-recruitment/delete/${id}`, {
+      showSuccess: true,
+    }),
+
+  /**
    * 获取部门管理员负责的报名列表
    * 部门管理员只能看到自己部门的报名记录
    * @param params 查询参数（year 可选）
@@ -1445,9 +1454,10 @@ export const permissionApi = {
    * 仅限 superadmin 使用
    * @param params 批量设置参数
    */
-  batchSetUserRoles: (params: BatchSetUserRolesParams) =>
+  batchSetUserRoles: (params: BatchSetUserRolesParams, config?: RequestConfig) =>
     request.post('/auth/login/admin/set', params, {
       showSuccess: true,
+      ...config,
     }),
 
   /**
