@@ -398,8 +398,8 @@ const openDetail = async (row: TeamTermInfo) => {
   detailVisible.value = true
   detailForm.term_id = row.term_id
   detailForm.term_name = row.term_name || ''
-  detailForm.start_date = row.start_date || ''
-  detailForm.end_date = row.end_date || ''
+  detailForm.start_date = dateUtil.formatDate(row.start_date) || ''
+  detailForm.end_date = dateUtil.formatDate(row.end_date) || ''
   detailForm.is_current = row.is_current || 0
   detailForm.remark = row.remark ?? ''
 
