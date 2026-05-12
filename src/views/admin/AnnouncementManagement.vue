@@ -453,7 +453,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, onBeforeUnmount, watch } from 'vue'
 import { Search, Refresh, Plus, Document } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 import AdminPageLayout from '@/components/admin/AdminPageLayout.vue'
@@ -500,6 +500,12 @@ const getMimeTypeByFileType = (type?: 'none' | 'pdf' | 'word' | ''): string => {
   return 'application/octet-stream'
 }
 
+const revokeBlobUrl = (url: string) => {
+  if (url.startsWith('blob:')) {
+    URL.revokeObjectURL(url)
+  }
+}
+
 const buildSignedPreviewUrl = async (
   fileKey?: string,
   fileType?: 'none' | 'pdf' | 'word' | '',
@@ -517,6 +523,34 @@ const buildSignedPreviewUrl = async (
     console.error('生成签名附件链接失败:', error)
     return fallbackUrl
   }
+}
+
+const buildPdfBlobPreviewUrl = async (sourceUrl: string): Promise<string> => {
+  if (!sourceUrl) return ''
+  try {
+    const response = await fetch(sourceUrl, { method: 'GET' })
+    if (!response.ok) {
+      throw new Error(`PDF 预览失败: ${response.status}`)
+    }
+    const buffer = await response.arrayBuffer()
+    return URL.createObjectURL(new Blob([buffer], { type: 'application/pdf' }))
+  } catch (error) {
+    console.error('构建 PDF Blob 预览失败:', error)
+    return ''
+  }
+}
+
+const buildAttachmentPreviewUrl = async (
+  fileKey?: string,
+  fileType?: 'none' | 'pdf' | 'word' | '',
+  fallbackUrl = ''
+): Promise<string> => {
+  const signedUrl = await buildSignedPreviewUrl(fileKey, fileType, fallbackUrl)
+  if (fileType === 'pdf') {
+    const blobUrl = await buildPdfBlobPreviewUrl(signedUrl)
+    return blobUrl || signedUrl
+  }
+  return signedUrl
 }
 
 const pagination = reactive({
@@ -590,7 +624,11 @@ const detailForm = reactive({
   updated_at: '',
 })
 
+let detailPreviewRequestId = 0
+
 const resetDetailForm = () => {
+  detailPreviewRequestId += 1
+  revokeBlobUrl(detailForm.file_url)
   detailForm.announcement_id = 0
   detailForm.title = ''
   detailForm.content = ''
@@ -679,6 +717,7 @@ const formatHtml = (html: string): string => {
 }
 
 const openDetail = async (row: AnnouncementInfo) => {
+  const requestId = ++detailPreviewRequestId
   detailVisible.value = true
   detailForm.announcement_id = row.announcement_id
   detailForm.title = row.title || ''
@@ -692,7 +731,13 @@ const openDetail = async (row: AnnouncementInfo) => {
   const fileKey = (row as AnnouncementInfo & { file_key?: string }).file_key || ''
   detailForm.file_key = fileKey
   // 不再依赖后端返回的 file_url，而是统一由前端根据 key 生成临时访问地址
-  detailForm.file_url = await buildSignedPreviewUrl(fileKey, detailForm.file_type, '')
+  const previewUrl = await buildAttachmentPreviewUrl(fileKey, detailForm.file_type, '')
+  if (requestId !== detailPreviewRequestId) {
+    revokeBlobUrl(previewUrl)
+    return
+  }
+  revokeBlobUrl(detailForm.file_url)
+  detailForm.file_url = previewUrl
   detailForm.created_at = (row as AnnouncementInfo & { created_at?: string }).created_at || ''
   detailForm.updated_at = (row as AnnouncementInfo & { updated_at?: string }).updated_at || ''
 }
@@ -723,6 +768,7 @@ const handleFileChange = async (file: UploadFile) => {
 
   fileUploading.value = true
   fileProgress.value = 0
+  const requestId = ++editPreviewRequestId
 
   try {
     const isPdf =
@@ -742,7 +788,13 @@ const handleFileChange = async (file: UploadFile) => {
         : undefined
     )
     // 仅在前端本地用于预览，不再提交给后端
-    editForm.file_url = url
+    const previewUrl = await buildAttachmentPreviewUrl(key, fileType, url)
+    if (requestId !== editPreviewRequestId) {
+      revokeBlobUrl(previewUrl)
+      return
+    }
+    revokeBlobUrl(editForm.file_url)
+    editForm.file_url = previewUrl
     editForm.file_key = key
     ElMessage.success('附件上传成功')
   } catch (error) {
@@ -779,6 +831,7 @@ const handleDetailFileChange = async (file: UploadFile) => {
 
   fileUploading.value = true
   fileProgress.value = 0
+  const requestId = ++detailPreviewRequestId
 
   try {
     const isPdf =
@@ -798,7 +851,13 @@ const handleDetailFileChange = async (file: UploadFile) => {
         : undefined
     )
     // 仅在前端本地用于预览，不再提交给后端
-    detailForm.file_url = url
+    const previewUrl = await buildAttachmentPreviewUrl(key, fileType, url)
+    if (requestId !== detailPreviewRequestId) {
+      revokeBlobUrl(previewUrl)
+      return
+    }
+    revokeBlobUrl(detailForm.file_url)
+    detailForm.file_url = previewUrl
     detailForm.file_key = key
     ElMessage.success('附件上传成功')
   } catch (error) {
@@ -934,7 +993,11 @@ const editForm = reactive<{
   file_key: '',
 })
 
+let editPreviewRequestId = 0
+
 const resetEditForm = () => {
+  editPreviewRequestId += 1
+  revokeBlobUrl(editForm.file_url)
   editForm.announcement_id = null
   editForm.title = ''
   editForm.content = ''
@@ -950,6 +1013,7 @@ const resetEditForm = () => {
 }
 
 const openEditDialog = async (row?: AnnouncementInfo) => {
+  const requestId = ++editPreviewRequestId
   if (row) {
     editForm.announcement_id = row.announcement_id
     editForm.title = row.title
@@ -961,7 +1025,13 @@ const openEditDialog = async (row?: AnnouncementInfo) => {
     editForm.file_type = (row.file_type as 'none' | 'pdf' | 'word') || 'none'
     const fileKey = (row as AnnouncementInfo & { file_key?: string }).file_key || ''
     editForm.file_key = fileKey
-    editForm.file_url = await buildSignedPreviewUrl(fileKey, editForm.file_type, '')
+    const previewUrl = await buildAttachmentPreviewUrl(fileKey, editForm.file_type, '')
+    if (requestId !== editPreviewRequestId) {
+      revokeBlobUrl(previewUrl)
+      return
+    }
+    revokeBlobUrl(editForm.file_url)
+    editForm.file_url = previewUrl
   } else {
     resetEditForm()
   }
@@ -1023,6 +1093,17 @@ const handleEditSave = async () => {
 
 onMounted(() => {
   loadData()
+})
+
+watch(detailVisible, (visible) => {
+  if (!visible) {
+    resetDetailForm()
+  }
+})
+
+onBeforeUnmount(() => {
+  resetDetailForm()
+  resetEditForm()
 })
 </script>
 
